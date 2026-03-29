@@ -1,0 +1,102 @@
+
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                                                              ║
+  ║         ✅ JARVIS INLINE - READY TO USE! 🎤                 ║
+  ║                                                              ║
+  ║              The 2026 Developer Voice Setup                  ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🚀 LAUNCH                                              ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+    ./jarvis-inline.sh
+
+  Menu bar icon appears: 🎤
+  Hotkey: Cmd+; (⌘+;)
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🎯 HOW TO USE IN CLAUDE CHAT                           ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  Step-by-step:
+
+  1. Position your cursor in Claude input box
+     → Click here: |
+
+  2. Press Cmd+; (Command + Semicolon)
+     → Notification: "🎤 Jarvis Recording"
+     → Menu bar: 🔴
+
+  3. Speak clearly: "Claude create a hello world function"
+     → Just speak normally
+
+  4. Press Cmd+; again
+     → Notification: "🧠 Transcribing..."
+     → Menu bar: 🧠
+
+  5. ✨ TEXT APPEARS!
+     → Types at cursor: "Claude create a hello world function"
+     → Press Enter
+     → I (Claude) execute with full context!
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🎮 KEYBOARD SHORTCUT                                   ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  Cmd+; = ⌘+;
+
+  On Mac keyboard:
+    ⌘ (Command) + ; (Semicolon)
+
+  Location:
+    Command = Left of spacebar
+    ; = Right side, next to 'L' key
+
+  Why Cmd+;?
+    ✓ Easy one-hand press
+    ✓ Doesn't conflict with VS Code
+    ✓ Doesn't conflict with browsers
+    ✓ Semicolon rarely used alone
+    ✓ Fast to trigger
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  💡 WHAT MAKES THIS PERFECT                             ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  ✅ No holding keys - Just tap!
+  ✅ No copy/paste - Auto-types at cursor
+  ✅ Works everywhere - Global hotkey
+  ✅ Visual feedback - Notifications + menu bar
+  ✅ Cursor-aware - Types exactly where you are
+  ✅ THIS conversation - Full context!
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🔧 PERMISSIONS (macOS will prompt)                     ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  System Settings → Privacy & Security:
+
+  ☑️  Accessibility → Terminal
+     (Needed to type text)
+
+  ☑️  Microphone → Terminal
+     (Needed to record voice)
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🎤 TRY IT NOW                                          ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  1. Run: ./jarvis-inline.sh
+  2. See 🎤 in menu bar
+  3. Click in this Claude chat
+  4. Press Cmd+;
+  5. Say: "Claude create a hello world function"
+  6. Press Cmd+;
+  7. Watch text appear!
+  8. Press Enter
+  9. I'll execute it! ✨
+
+  This is the voice coding setup of 2026! 🚀
+

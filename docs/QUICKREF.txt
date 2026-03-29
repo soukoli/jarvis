@@ -1,0 +1,45 @@
+
+╔════════════════════════════════════════════════════╗
+║  🎤 JARVIS - QUICK REFERENCE                      ║
+╚════════════════════════════════════════════════════╝
+
+LAUNCH
+  ./run.sh
+
+CONTROLS (Two separate keys - more reliable!)
+  Cmd+;  START recording  (⌘+;)
+  Cmd+'  STOP recording   (⌘+')
+
+WORKFLOW
+  1. Position cursor in Claude chat
+  2. Cmd+; → 🔴 starts recording
+  3. Speak: "Claude create a hello world function"
+  4. Cmd+' → 🧠 transcribes & types text
+  5. Press Enter
+  6. Claude executes! ✨
+
+VISUAL FEEDBACK
+  Menu bar: 🎤 → 🔴 → 🧠 → 🎤
+  Notifications show status
+
+TROUBLESHOOTING
+  python3 debug_keys.py  # Test keyboard detection
+  python3 cache.py show  # View cached audio
+  python3 test.py        # System check
+
+FILES
+  run.sh         Launch Jarvis
+  jarvis.py      Main app
+  src/           Core modules
+  README.md      Full docs
+
+CACHE
+  .voice_cache/  Auto-managed (keeps last 5)
+
+WHY SEPARATE KEYS?
+  ✓ No toggle confusion
+  ✓ Clear start vs stop
+  ✓ More reliable
+  ✓ Industry standard (walkie-talkie style)
+
+Ready? ./run.sh

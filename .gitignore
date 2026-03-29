@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Whisper models
+models/
+*.bin
+
+# Audio recordings
+recordings/
+.voice_cache/
+*.wav
+*.mp3
+
+# Session integration
+.jarvis_prompt.txt
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
