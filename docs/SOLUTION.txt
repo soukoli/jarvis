@@ -1,0 +1,127 @@
+
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                                                              ║
+  ║              ✅ PERFECT SOLUTION - TWO MODES!               ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  Problem: Jarvis was spawning NEW Claude sessions instead
+           of using THIS conversation where you have context!
+
+  Solution: TWO MODES - Choose what works for you!
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🎯 MODE 1: SESSION (RECOMMENDED)                      ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  Perfect for when you're already talking to Claude!
+
+  How it works:
+    You → Hold ` → Speak → Release
+    Jarvis → Shows transcription
+    You → Copy & paste into THIS chat
+    Claude → Executes with FULL context! ✨
+
+  Why it's better:
+    ✓ I (Claude) have your project context
+    ✓ I remember our conversation
+    ✓ I have access to memory & preferences
+    ✓ You can review before I execute
+    ✓ All tools available (files, git, etc.)
+
+  Launch:
+    ./jarvis.sh                    # Default mode
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🤖 MODE 2: NEW CLI (Hands-free)                       ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  Fully automated - spawns separate Claude sessions
+
+  How it works:
+    You → Hold ` → Speak → Release
+    Jarvis → Auto-executes in new CLI
+    Done! (no copy/paste needed)
+
+  Limitations:
+    ✗ No context from THIS conversation
+    ✗ New session each time
+    ✗ No memory of previous commands
+
+  Launch:
+    ./jarvis.sh --mode newcli
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🚀 RECOMMENDED WORKFLOW                               ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  Since you're ALREADY in a Claude conversation:
+
+  Terminal 1 (this one):
+    → Continue chatting with me (Claude)
+    → I have full context & memory
+
+  Terminal 2 (new window):
+    → Run: ./jarvis.sh
+    → Hold ` and speak
+    → Copy transcription
+
+  Back to Terminal 1:
+    → Paste into this chat
+    → I execute it! 🎯
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  💡 EXAMPLE SESSION                                    ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  # Terminal 2: Run Jarvis
+  $ ./jarvis.sh
+  🎤 Jarvis Voice Assistant Ready
+     Hold ` (backtick) to talk, ESC to quit
+
+  # You: Hold ` and say "Claude create a hello world function"
+
+  📝 Transcribed: Claude create a hello world function
+
+  ══════════════════════════════════════════════════════════
+  🤖 SEND THIS TO CLAUDE:
+  ══════════════════════════════════════════════════════════
+
+     Claude create a hello world function
+
+  ══════════════════════════════════════════════════════════
+
+  # Copy that, paste into Terminal 1 (this chat)
+  # I (Claude) execute it with full context! ✨
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  ⚡ QUICK REFERENCE                                     ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  Default (session mode):
+    ./jarvis.sh
+
+  Fully automated (new CLI):
+    ./jarvis.sh --mode newcli
+
+  Different trigger key:
+    ./jarvis.sh --trigger ctrl+r
+
+  Help:
+    python3 jarvis.py --help
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🎮 CONTROLS                                           ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+    HOLD `       Start recording (backtick = top-left key)
+    SPEAK        Say your command clearly
+    RELEASE `    Stop & transcribe
+    ESC          Quit Jarvis
+
+  Ready to try it? Open a new terminal and run:
+
+    ./jarvis.sh
+
+  Then speak to me! 🎤
+

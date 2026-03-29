@@ -1,0 +1,160 @@
+
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                                                              ║
+  ║        🎯 JARVIS GLOBAL - THE PERFECT SOLUTION!            ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  System-wide voice assistant that works EVERYWHERE!
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  ✨ HOW IT WORKS                                        ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  1. Tap ` (backtick)         → 🔴 Popup: "Recording..."
+  2. Speak your command       → 🎤 Voice captured
+  3. Tap ` again              → 🧠 Transcribing...
+  4. AUTO-TYPES into window!  → ✨ Text appears automatically
+
+  No holding keys! No copy/paste! Works in ANY app!
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🚀 LAUNCH                                              ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+    ./jarvis-global.sh
+
+  • Runs in background
+  • Icon appears in menu bar (🎤)
+  • Works in ALL applications:
+      ✓ This Claude chat
+      ✓ VS Code
+      ✓ Terminal
+      ✓ Browser
+      ✓ Slack
+      ✓ Email
+      ✓ Anywhere!
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🎮 USAGE EXAMPLE                                       ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  You're typing in Claude Code (this conversation):
+
+  1. Tap ` (backtick)
+     → Notification: "Jarvis Listening - Speak now..."
+     → Menu bar icon turns red: 🔴
+
+  2. Say: "Claude create a hello world function"
+     → Just speak normally
+
+  3. Tap ` again
+     → Notification: "Transcribing..."
+     → Menu bar: 🧠
+
+  4. AUTO-MAGIC! ✨
+     → Text appears in your cursor: "Claude create a hello world function"
+     → I (Claude) see it and execute!
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  💡 WHY THIS IS PERFECT                                 ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  ✓ No holding keys (just tap!)
+  ✓ No copy/paste (auto-types)
+  ✓ Works everywhere (global)
+  ✓ Visual feedback (notifications + menu bar)
+  ✓ Clean UX (tap to start, tap to stop)
+  ✓ Goes to THIS conversation (full context!)
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🎯 MENU BAR FEATURES                                   ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  Click 🎤 icon in menu bar:
+
+    Status: Ready         Current state
+    ─────────────────
+    Change Hotkey         Pick different key
+    Test Microphone       3-sec recording test
+    ─────────────────
+    Quit                  Stop Jarvis
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🎨 VISUAL FEEDBACK                                     ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  Menu Bar Icon:
+    🎤  Ready / Idle
+    🔴  Recording (listening)
+    🧠  Transcribing
+
+  Notifications:
+    "Jarvis Listening"    → When you start
+    "Jarvis Success"      → When text typed
+    "Jarvis Error"        → If something fails
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🔧 FIRST TIME SETUP                                    ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  1. Grant permissions:
+     System Settings → Privacy & Security
+       → Accessibility → Allow Terminal
+       → Microphone → Allow Terminal
+
+  2. Launch:
+     ./jarvis-global.sh
+
+  3. Test:
+     • Click menu bar icon → "Test Microphone"
+     • Or tap ` and speak "hello test"
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  ⚡ QUICK START                                         ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  In this Claude chat:
+
+  Terminal window:
+    $ ./jarvis-global.sh
+    🚀 Starting Jarvis Global...
+       System-wide voice assistant
+       Will appear in menu bar
+
+    🎤 Launching...
+       Press ` (backtick) anywhere to start/stop recording
+       Transcription will be typed into active window
+
+  Menu bar shows: 🎤
+
+  Now, in THIS Claude chat window:
+    1. Click here to focus cursor
+    2. Tap ` (backtick)
+    3. Say: "Claude create a hello world function"
+    4. Tap `
+    5. Watch text appear! ✨
+    6. I execute it!
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  📝 COMPARISON                                          ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  OLD (jarvis.sh):
+    ✗ Hold key (annoying)
+    ✗ Terminal only
+    ✗ Copy/paste needed
+    ✗ Can't use other apps while recording
+
+  NEW (jarvis-global.sh):
+    ✓ Tap to start, tap to stop
+    ✓ Works in ALL apps
+    ✓ Auto-types (no paste!)
+    ✓ Visual feedback (notifications)
+    ✓ Menu bar control
+    ✓ Much better UX!
+
+  Ready to try it?
+
+    ./jarvis-global.sh
+

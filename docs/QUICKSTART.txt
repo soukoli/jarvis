@@ -1,0 +1,71 @@
+
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                                                              ║
+  ║              🎤 JARVIS - QUICK START GUIDE                  ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  ✅ READY TO GO                                         ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  All systems ready:
+    ✓ Whisper.cpp (local STT)
+    ✓ Claude CLI integration
+    ✓ Smart caching
+    ✓ Better trigger keys (no more SPACE!)
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🚀 LAUNCH                                              ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+    ./jarvis.sh                    # Start with backtick trigger
+    ./jarvis.sh --trigger ctrl+r   # Use Ctrl+R instead
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🎮 DEFAULT CONTROLS                                    ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+    HOLD `        Hold backtick key (top-left of keyboard)
+                  → 🔴 Recording starts
+
+    SPEAK         "Claude create a hello world function"
+                  → 🎤 Voice captured
+
+    RELEASE `     Release backtick key
+                  → 🧠 Whisper transcribes (1-2 sec)
+                  → 🤖 Claude executes automatically
+
+    ESC           Quit Jarvis
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  🎯 FIRST TEST                                          ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  1. Run: ./jarvis.sh
+  2. Hold ` (backtick key)
+  3. Say: "Claude create a hello world function"
+  4. Release `
+  5. Watch it work! ✨
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  💡 TIPS                                                ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+  • Backtick (`) is on the TOP-LEFT of your keyboard
+  • Speak clearly at normal pace
+  • Include "Claude" in your commands
+  • If ` doesn't work, try: ./jarvis.sh --trigger ctrl+r
+  • Recordings auto-cached in .voice_cache/ (keeps last 5)
+
+  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+  ┃  📚 MORE INFO                                           ┃
+  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+    README.md           Overview
+    USAGE.md            Command examples
+    python3 jarvis.py --help    All options
+    python3 select_trigger.py   Choose different trigger
+
+  Ready? Run: ./jarvis.sh
+
