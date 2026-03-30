@@ -1,213 +1,163 @@
-# 🎤 Jarvis Voice Coding Assistant
+# 🎤 Jarvis Voice Assistant
 
-System-wide voice assistant that auto-types at your cursor. Perfect for Claude Code!
+**Voice-to-text for macOS that works everywhere.** Speak naturally, get instant transcription on clipboard, paste anywhere.
 
-## Quick Start
+Built with local processing (whisper.cpp) - free, private, offline.
 
-```bash
-./run.sh
-```
-
-Menu bar icon 🎤 appears. Ready to use!
-
-## How To Use
-
-**Method 1: Hotkeys** (fastest)
-1. Position cursor in Claude chat
-2. **Cmd+;** (⌘+;) → Starts recording 🔴
-3. Speak: "Claude create a hello world function"
-4. **Cmd+'** (⌘+') → Stops & types text ✨
-5. Press Enter → Claude executes!
-
-**Method 2: Menu Buttons** (most reliable)
-1. Click 🎤 in menu bar
-2. Click **"▶️ Start Recording"**
-3. Speak your command
-4. Click **"⏹️ Stop Recording"**
-5. Text types at cursor!
-
-## Why Two Methods?
-
-- **Hotkeys** = Fast, convenient
-- **Menu buttons** = Always works, can't fail
-
-Use menu if hotkeys have focus issues!
-
-## Menu Bar Features
-
-Click 🎤 icon:
-
-```
-▶️  Start Recording    Click to start
-⏹️  Stop Recording     Click to stop (active when recording)
-─────────────────
-Hotkeys:
-  Cmd+; = Start
-  Cmd+' = Stop
-─────────────────
-🧪 Test Microphone     3-second test
-ℹ️  About              App info
-─────────────────
-Quit Jarvis
-```
-
-## Visual Feedback
-
-**Menu bar icon:**
-- 🎤 Jarvis - Ready
-- 🔴 Recording - Listening to you
-- 🧠 Processing - Transcribing
-
-**Notifications:**
-- "🎤 Recording" when you start
-- "✅ Done!" when text is typed
+---
 
 ## Installation
 
+### Quick Start
+
 ```bash
-# First time only
+# 1. Run setup (installs dependencies and builds whisper.cpp)
 ./setup.sh
 
-# Every time
+# 2. Run Jarvis
 ./run.sh
 ```
 
-## Requirements
-
-- macOS
-- Python 3.8+
-- Microphone permission
-- Accessibility permission (for typing)
-
-## Permissions
-
-macOS will prompt on first run:
-
-**Microphone** → Allow Terminal
-- Needed to record voice
-
-**Accessibility** → Allow Terminal
-- Needed to type text automatically
-
-Grant both in System Settings → Privacy & Security
-
-## Troubleshooting
-
-**Hotkeys not working?**
-- Use menu buttons instead! Click 🎤 → Start Recording
-- Menu buttons always work, no focus issues
-
-**No audio captured?**
-```bash
-python3 debug_keys.py  # Test keyboard
-python3 test.py        # Test system
-```
-
-**Recording won't stop?**
-- Click menu bar 🎤 → "⏹️ Stop Recording"
-- Menu button bypasses hotkey issues
-
-**Check logs:**
-- Console shows all activity
-- Look for "START key pressed" / "STOP key pressed"
-
-## Project Structure
-
-```
-jarvis-coding/
-├── run.sh              # Launch
-├── jarvis.py           # Main app
-├── setup.sh            # Install
-├── src/
-│   ├── voice_capture.py    # Audio
-│   └── speech_to_text.py   # Whisper
-├── test.py             # Tests
-├── cache.py            # Cache manager
-├── debug_keys.py       # Debug tool
-└── whisper.cpp/        # STT engine
-```
-
-## Cache
-
-Recordings stored in `.voice_cache/` (auto-keeps last 5):
+**Or manually:**
 
 ```bash
-python3 cache.py show   # View
-python3 cache.py clean  # Clean
-```
+# Install system dependencies
+brew install portaudio cmake
 
-## Example Commands
+# Install Python dependencies
+pip3 install pynput rumps pyaudio setproctitle
 
-In Claude chat:
-- "Claude create a React component"
-- "Fix the authentication bug"
-- "Write unit tests"
-- "Refactor this function"
+# Build whisper.cpp
+git clone https://github.com/ggerganov/whisper.cpp.git
+cd whisper.cpp
+cmake -B build && cmake --build build --config Release
+bash ./models/download-ggml-model.sh base.en
+cd ..
 
-In VS Code:
-- "Add error handling"
-- "Create a new function"
-
-Anywhere:
-- Natural speech becomes text!
-
-## Why This Is Better
-
-| Feature | Jarvis | Alternatives |
-|---------|--------|--------------|
-| Price | Free | Paid APIs |
-| Privacy | 100% local | Cloud-based |
-| Integration | Claude Code | Basic dictation |
-| Control | Hotkeys + Menu | Hotkeys only |
-| Reliability | Menu fallback | Can get stuck |
-
-## Tips
-
-- **Use menu buttons** if hotkeys act weird (most reliable!)
-- Speak clearly at normal pace
-- Menu bar shows current state (🎤/🔴/🧠)
-- Cmd+; and Cmd+' are next to each other (easy!)
-
-## The Fix
-
-**Problem:** Toggle on single key caused focus/state issues
-
-**Solution:**
-- Separate START (Cmd+;) and STOP (Cmd+') keys
-- Menu buttons as backup
-- Debouncing prevents double-triggers
-- State management prevents conflicts
-
-## Development
-
-**Test:**
-```bash
-python3 test.py
-```
-
-**Debug keyboard:**
-```bash
-python3 debug_keys.py
-```
-
-**Clean reinstall:**
-```bash
-rm -rf whisper.cpp .voice_cache
-./setup.sh
+# Run Jarvis
+./run.sh
 ```
 
 ---
 
-## 🚀 Ready To Use!
+## How to Use
 
-```bash
-./run.sh
+1. **Cmd+;** - Start recording (🔴 appears in menu bar)
+2. **Speak clearly**
+3. **Cmd+'** - Stop recording (🧠 shows "Transcribing")
+4. **Wait for sound** - "Ding!" means transcription complete
+5. **Cmd+V** - Paste transcribed text
+
+**⚠️ Important:** Watch the menu bar icon! Wait for 🧠 to change back to 🎤 and hear the sound before pasting.
+
+### Menu Bar (Alternative to Hotkeys)
+
+Click 🎤 icon:
+- **▶️ Start Recording** - Begin capture
+- **⏹️ Stop Recording** - End capture (enabled while recording)
+
+**Settings:**
+- **🔊 Completion Sound** - Toggle "ding" when done (✓ = enabled)
+
+**Info:**
+- **ℹ️ About** - App info and workflow
+- **Quit Jarvis** - Exit app
+
+**Icon states:**
+- 🎤 = Ready to record
+- 🔴 = Recording your voice
+- 🧠 = Transcribing (DO NOT paste yet!)
+
+**When transcription completes:**
+- Icon: 🧠 → 🎤 (back to ready)
+- Sound: "Ding" plays (if enabled)
+- Clipboard: Text is ready to paste
+
+---
+
+## Permission Setup
+
+**Required:** Input Monitoring (for global hotkeys)
+
+1. Open **System Settings**
+2. Go to **Privacy & Security** → **Input Monitoring**
+3. Add **Terminal** (or Python)
+4. **Quit Terminal** completely (Cmd+Q)
+5. Reopen and run `./run.sh`
+
+**Without permission:**
+- Hotkeys (Cmd+;, Cmd+') won't work
+- Menu bar buttons still work fine!
+
+---
+
+## Example Usage
+
+**In Claude Code:**
+```
+Cmd+;  → "Create a React authentication component"
+Cmd+'  → [notification: "Ready to Paste!"]
+Cmd+V  → Text appears in chat
+Enter  → Claude executes
 ```
 
-Then **either**:
-- Press **Cmd+;** to start (hotkey)
-- Or click menu **▶️ Start Recording** (always works!)
+**In VS Code:**
+```
+Cmd+;  → "Add error handling for null values"
+Cmd+'  → [wait for notification]
+Cmd+V  → Text appears at cursor
+```
 
-Speak, then stop with **Cmd+'** or click **⏹️ Stop**.
+**Anywhere:**
+- Browser search
+- Email
+- Slack
+- Documentation
+- Comments
 
-Text appears at your cursor! ✨
+---
+
+## Troubleshooting
+
+**Hotkeys not working?**
+1. Grant Input Monitoring permission (see above)
+2. Verify: `ps aux | grep Jarvis` (should show process)
+3. Restart Terminal and run `./run.sh`
+
+**No transcription or wrong text?**
+- Check terminal output for microphone device being used
+- Verify whisper: `./whisper.cpp/build/bin/whisper-cli --version`
+- Check logs in terminal for "Max amplitude" - should be >100
+
+**Want to stop?**
+- Click 🎤 → Quit Jarvis
+- Or press Ctrl+C in terminal
+
+---
+
+## Technical Details
+
+| Component | Technology |
+|-----------|------------|
+| **Menu Bar UI** | rumps |
+| **Hotkeys** | pynput (global keyboard listener) |
+| **Audio** | pyaudio (16kHz mono WAV) |
+| **Transcription** | whisper.cpp (base.en model, Metal accelerated) |
+| **Workflow** | Voice → STT → Clipboard → Manual paste |
+
+**Why clipboard?** macOS blocks keyboard automation for security. Clipboard workflow is reliable and works everywhere.
+
+**Storage:**
+- Recordings: `.voice_cache/` (auto-keeps last 5)
+
+---
+
+## Commands Reference
+
+```bash
+./run.sh   # Run Jarvis from terminal
+```
+
+---
+
+**Jarvis v2.0** - Simple, local, reliable voice-to-text for macOS

@@ -1,15 +1,24 @@
-#!/bin/bash
-# Simple launcher for Jarvis
+#!/usr/bin/env zsh
+# Jarvis Voice Assistant - Terminal launcher
 
 cd "$(dirname "$0")"
 
-# Fix notifications
-PYTHON_BIN=$(python3 -c "import sys; print(sys.prefix + '/bin')")
-PLIST="$PYTHON_BIN/Info.plist"
-[ ! -f "$PLIST" ] && /usr/libexec/PlistBuddy -c 'Add :CFBundleIdentifier string "com.jarvis"' "$PLIST" 2>/dev/null || true
+# Detect Python (mise first, then fallbacks)
+PYTHON=""
+if command -v mise &>/dev/null; then
+    PYTHON=$(mise which python 2>/dev/null)
+fi
+[ -z "$PYTHON" ] && PYTHON="$HOME/.local/share/mise/installs/python/3.12.12/bin/python3"
+[ ! -f "$PYTHON" ] && PYTHON=$(which python3 2>/dev/null)
 
-# Check deps
-python3 -c "import rumps" 2>/dev/null || pip3 install rumps
+# Verify Python exists
+if [ -z "$PYTHON" ] || [ ! -f "$PYTHON" ]; then
+    echo "❌ Python not found"
+    exit 1
+fi
+
+# Launch Jarvis
+exec $PYTHON jarvis.py
 
 cat << 'EOF'
 
@@ -18,10 +27,17 @@ cat << 'EOF'
 ╚════════════════════════════════════════════════════╝
 
 Controls:
-  Cmd+;  = START recording (⌘+;)
-  Cmd+'  = STOP recording  (⌘+')
+  Cmd+;  = START recording
+  Cmd+'  = STOP recording
 
-Transcription auto-types at cursor! ✨
+Feedback:
+  🔴 Menu bar → Recording
+  🧠 Menu bar → Transcribing (wait!)
+  🔊 Sound    → Ready to paste
+  🎤 Menu bar → Back to ready
+
 EOF
 
-python3 jarvis.py
+exec $PYTHON jarvis.py
+
+
