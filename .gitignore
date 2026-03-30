@@ -7,25 +7,24 @@ __pycache__/
 venv/
 ENV/
 
-# Whisper models
-models/
-*.bin
+# Whisper.cpp (cloned during setup)
+whisper.cpp/
 
-# Audio recordings
-recordings/
+# Audio cache
 .voice_cache/
 *.wav
 *.mp3
 
-# Session integration
-.jarvis_prompt.txt
-
 # Logs
 *.log
 
-# OS
+# macOS
 .DS_Store
+.jarvis_prompt.txt
+Info.plist
 
 # IDE
 .vscode/
 .idea/
+
+
