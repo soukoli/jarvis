@@ -121,7 +121,7 @@ class JarvisApp(rumps.App):
                 return
             self.recording = True
 
-        print(f"[{time.strftime('%H:%M:%S')}] 🔴 Recording started", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] Recording started", flush=True)
         self.title = "🔴 Recording"
         self.menu["▶️  Start Recording"].set_callback(None)
         self.menu["⏹️  Stop Recording"].set_callback(self.stop_recording)
@@ -135,7 +135,7 @@ class JarvisApp(rumps.App):
             self.recording = False
             self.processing = True
 
-        print(f"[{time.strftime('%H:%M:%S')}] ⏹️  Recording stopped", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] Recording stopped", flush=True)
         self.title = "🧠 Transcribing"
         self.menu["▶️  Start Recording"].set_callback(None)
         self.menu["⏹️  Stop Recording"].set_callback(None)
@@ -146,7 +146,7 @@ class JarvisApp(rumps.App):
             self._reset_state()
             return
 
-        print(f"[{time.strftime('%H:%M:%S')}] 🧠 Transcribing audio...", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] Transcribing...", flush=True)
         # Process in background thread
         threading.Thread(
             target=self._process_audio,
@@ -160,20 +160,23 @@ class JarvisApp(rumps.App):
             # Transcribe
             text = self.stt.transcribe(audio_file)
             if not text or not text.strip():
-                print(f"[{time.strftime('%H:%M:%S')}] ⚠️  No transcription result", flush=True)
+                print(f"[{time.strftime('%H:%M:%S')}] No transcription result", flush=True)
                 return
 
             # Copy to clipboard
             subprocess.run(['pbcopy'], input=text, text=True, timeout=1, check=True)
-            print(f"[{time.strftime('%H:%M:%S')}] ✅ Copied to clipboard: {text[:50]}{'...' if len(text) > 50 else ''}", flush=True)
+            print(f"[{time.strftime('%H:%M:%S')}] Copied: {text[:50]}{'...' if len(text) > 50 else ''}", flush=True)
 
             # Play completion sound if enabled
             if self.completion_sound:
-                subprocess.run(['afplay', '/System/Library/Sounds/Glass.aiff'],
-                             timeout=2, check=False)
+                try:
+                    subprocess.run(['afplay', '/System/Library/Sounds/Glass.aiff'],
+                                 timeout=2, check=False, stderr=subprocess.DEVNULL)
+                except:
+                    pass  # Silently ignore sound errors
 
         except Exception as e:
-            print(f"[{time.strftime('%H:%M:%S')}] ❌ Error: {e}", flush=True)
+            print(f"[{time.strftime('%H:%M:%S')}] Error: {e}", flush=True)
         finally:
             self._reset_state()
             try:

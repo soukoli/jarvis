@@ -26,18 +26,14 @@ class WhisperSTT:
     def transcribe(self, audio_file: str) -> Optional[str]:
         """Transcribe audio to text"""
         if not os.path.exists(self.whisper_bin):
-            print(f"❌ Whisper not found at {self.whisper_bin}", flush=True)
+            print(f"Whisper not found at {self.whisper_bin}", flush=True)
             return None
 
         if not os.path.exists(self.model_path):
-            print(f"❌ Model not found at {self.model_path}", flush=True)
+            print(f"Model not found at {self.model_path}", flush=True)
             return None
 
         try:
-            # Check audio file size
-            size_kb = os.path.getsize(audio_file) / 1024
-            print(f"🎧 Audio file: {size_kb:.1f}KB", flush=True)
-
             result = subprocess.run(
                 [self.whisper_bin, "-m", self.model_path, "-f", audio_file, "-t", "4", "-nt"],
                 capture_output=True,
@@ -46,16 +42,15 @@ class WhisperSTT:
             )
 
             if result.returncode != 0:
-                print(f"❌ Whisper failed: {result.stderr[:200]}", flush=True)
+                print(f"Whisper failed: {result.stderr[:200]}", flush=True)
                 return None
 
             text = result.stdout.strip().replace("[BLANK_AUDIO]", "").strip()
-            print(f"📝 Raw transcription: '{text}'", flush=True)
             return text if text else None
 
         except subprocess.TimeoutExpired:
-            print(f"❌ Whisper timeout", flush=True)
+            print(f"Whisper timeout", flush=True)
             return None
         except Exception as e:
-            print(f"❌ Whisper error: {e}", flush=True)
+            print(f"Whisper error: {e}", flush=True)
             return None
