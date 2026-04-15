@@ -447,6 +447,16 @@ class JarvisApp(rumps.App):
 
     def show_about(self, _=None):
         """Show about dialog"""
+        # Bring to front
+        try:
+            subprocess.run(
+                ['osascript', '-e', f'tell application "System Events" to set frontmost of first process whose unix id is {os.getpid()} to true'],
+                capture_output=True,
+                timeout=1
+            )
+        except:
+            pass
+
         rumps.alert(
             title="Jarvis Voice Assistant",
             message=(
