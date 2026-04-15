@@ -113,15 +113,15 @@ class WhisperSTT:
             print(f"Model not found at {self.model_path}", flush=True)
             return None
 
-        # Build command
+        # Build command - optimized for speed
         cmd = [
             self.whisper_bin,
             "-m", self.model_path,
             "-f", audio_file,
-            "-t", "4",              # 4 threads
+            "-t", "8",              # 8 threads (increased from 4 for speed)
             "-nt",                  # No timestamps
-            "-bo", "5",             # Best of 5 candidates (improves accuracy)
-            "-bs", "5",             # Beam size 5 (improves accuracy)
+            "-bo", "3",             # Best of 3 (balanced speed/accuracy)
+            "-bs", "3",             # Beam size 3 (balanced speed/accuracy)
         ]
 
         # Add language flag for multilingual models

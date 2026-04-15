@@ -1,14 +1,7 @@
 #!/usr/bin/env zsh
-# Jarvis Voice Assistant - Safe launcher with checks
+# Jarvis Voice Assistant - Simple launcher
 
 cd "$(dirname "$0")"
-
-# Quick validation
-echo "🔍 Checking..."
-python3 -m py_compile jarvis.py src/*.py 2>/dev/null || {
-    echo "❌ Syntax error detected. Run: python3 -m py_compile jarvis.py src/*.py"
-    exit 1
-}
 
 # Detect Python (mise first, then fallbacks)
 PYTHON=""
@@ -23,7 +16,6 @@ if [ -z "$PYTHON" ] || [ ! -f "$PYTHON" ]; then
     exit 1
 fi
 
-echo "✅ Starting Jarvis..."
-echo ""
+echo "🚀 Starting Jarvis..."
 exec $PYTHON jarvis.py
 
