@@ -46,11 +46,13 @@ class JarvisApp(rumps.App):
         # User preferences - load from config
         config = self._load_config()
         self.completion_sound = config.get('completion_sound', True)
+        self.language_announcement = config.get('language_announcement', True)  # New setting
         self.available_devices = []
         self.current_device_name = config.get('device_name', None)
         self.current_language = config.get('language', 'auto')
         self.hotkey_start = config.get('hotkey_start', ';')
         self.hotkey_stop = config.get('hotkey_stop', "'")
+        self.hotkey_cancel = config.get('hotkey_cancel', '.')  # Cancel key
 
         # Set language in STT engine
         self.stt.set_language(self.current_language)
@@ -83,26 +85,31 @@ class JarvisApp(rumps.App):
         # Create menu items and store references
         self.start_menu_item = rumps.MenuItem(f"▶️  Start Recording (Cmd+{self.hotkey_start})", callback=self.start_recording)
         self.stop_menu_item = rumps.MenuItem(f"⏹️  Stop Recording (Cmd+{self.hotkey_stop})", callback=None)
+        self.cancel_menu_item = rumps.MenuItem(f"❌ Cancel (Cmd+{self.hotkey_cancel})", callback=None)
         self.sound_menu_item = rumps.MenuItem("🔊 Completion Sound", callback=self.toggle_sound)
+        self.announcement_menu_item = rumps.MenuItem("🗣️ Language Announcement", callback=self.toggle_announcement)
 
         # Build clean, simple menu
         self.menu = [
             self.start_menu_item,
             self.stop_menu_item,
+            self.cancel_menu_item,
             None,
             "🗣️ Transcription Language:",
             self.current_lang_menu_item,
             (rumps.MenuItem("Change Language..."), lang_submenu),
             None,
             self.sound_menu_item,
+            self.announcement_menu_item,
             None,
             rumps.MenuItem("ℹ️  About", callback=self.show_about),
             None,
             rumps.MenuItem("Quit Jarvis", callback=rumps.quit_application)
         ]
 
-        # Set initial checkmark for sound
+        # Set initial checkmarks
         self.sound_menu_item.state = 1 if self.completion_sound else 0
+        self.announcement_menu_item.state = 1 if self.language_announcement else 0
 
         self._print_banner()
         self._init_hotkeys()
@@ -122,10 +129,12 @@ class JarvisApp(rumps.App):
         try:
             config = {
                 'completion_sound': self.completion_sound,
+                'language_announcement': self.language_announcement,
                 'device_name': self.current_device_name,
                 'language': self.current_language,
                 'hotkey_start': self.hotkey_start,
-                'hotkey_stop': self.hotkey_stop
+                'hotkey_stop': self.hotkey_stop,
+                'hotkey_cancel': self.hotkey_cancel
             }
             with open(self.config_file, 'w') as f:
                 json.dump(config, f, indent=2)
@@ -139,7 +148,9 @@ class JarvisApp(rumps.App):
         print("╚════════════════════════════════════════════════════╝\n")
         print("Controls:")
         print(f"  Cmd+{self.hotkey_start}  = START recording")
-        print(f"  Cmd+{self.hotkey_stop}  = STOP recording\n")
+        print(f"  Cmd+{self.hotkey_stop}  = STOP recording")
+        print(f"  Cmd+{self.hotkey_cancel}  = CANCEL (abort)")
+        print("")
         print("Feedback:")
         print("  🔴 Menu bar → Recording")
         print("  🧠 Menu bar → Transcribing (wait!)")
@@ -238,6 +249,10 @@ class JarvisApp(rumps.App):
 
     def _announce_language(self):
         """Announce the current language with speech and play notification sound"""
+        # Skip if announcement is disabled
+        if not self.language_announcement:
+            return
+
         try:
             # Get the spoken name for the current language
             spoken_name = self.stt.get_language_spoken_name(self.current_language)
@@ -287,6 +302,9 @@ class JarvisApp(rumps.App):
                     elif char == self.hotkey_stop:
                         self.last_key_time = now
                         rumps.timer(0.05)(self.stop_recording)()
+                    elif char == self.hotkey_cancel:
+                        self.last_key_time = now
+                        rumps.timer(0.05)(self.cancel_operation)()
                 except AttributeError:
                     pass
 
@@ -311,6 +329,7 @@ class JarvisApp(rumps.App):
         self._update_title_with_flag("recording")
         self.start_menu_item.set_callback(None)
         self.stop_menu_item.set_callback(self.stop_recording)
+        self.cancel_menu_item.set_callback(self.cancel_operation)
         self.voice.start_recording()
 
     def stop_recording(self, _=None):
@@ -325,6 +344,7 @@ class JarvisApp(rumps.App):
         self._update_title_with_flag("processing")
         self.start_menu_item.set_callback(None)
         self.stop_menu_item.set_callback(None)
+        self.cancel_menu_item.set_callback(self.cancel_operation)
 
         audio_file = self.voice.stop_recording()
 
@@ -374,9 +394,45 @@ class JarvisApp(rumps.App):
         """Toggle completion sound"""
         self.completion_sound = not self.completion_sound
         sender.state = 1 if self.completion_sound else 0
-
-        # Save to config
         self._save_config()
+
+    def toggle_announcement(self, sender):
+        """Toggle language announcement"""
+        self.language_announcement = not self.language_announcement
+        sender.state = 1 if self.language_announcement else 0
+        self._save_config()
+
+    def cancel_operation(self, _=None):
+        """Cancel recording or transcription"""
+        with self._state_lock:
+            if not self.recording and not self.processing:
+                return  # Nothing to cancel
+
+            was_recording = self.recording
+            was_processing = self.processing
+
+            self.recording = False
+            self.processing = False
+
+        # Stop voice recording if active
+        if was_recording:
+            try:
+                self.voice.stop_recording()
+                print(f"[{time.strftime('%H:%M:%S')}] Recording cancelled", flush=True)
+            except:
+                pass
+
+        if was_processing:
+            print(f"[{time.strftime('%H:%M:%S')}] Transcription cancelled", flush=True)
+
+        # Show notification
+        rumps.notification(
+            title="Cancelled",
+            subtitle="Operation stopped",
+            message="Recording/transcription aborted"
+        )
+
+        self._reset_state()
 
     def _reset_state(self):
         """Reset to ready state"""
@@ -387,6 +443,7 @@ class JarvisApp(rumps.App):
         self._update_title_with_flag("ready")
         self.start_menu_item.set_callback(self.start_recording)
         self.stop_menu_item.set_callback(None)
+        self.cancel_menu_item.set_callback(None)
 
     def show_about(self, _=None):
         """Show about dialog"""
@@ -399,8 +456,13 @@ class JarvisApp(rumps.App):
                 f"1. Cmd+{self.hotkey_start} → Start recording (hear language + beep)\n"
                 "2. Speak clearly in your selected language\n"
                 f"3. Cmd+{self.hotkey_stop} → Stop & transcribe\n"
-                "4. Hear 'ding' → Text ready on clipboard\n"
-                "5. Cmd+V → Paste transcribed text anywhere\n\n"
+                f"4. Cmd+{self.hotkey_cancel} → Cancel/abort anytime\n"
+                "5. Hear 'ding' → Text ready on clipboard\n"
+                "6. Cmd+V → Paste transcribed text anywhere\n\n"
+                "Keyboard shortcuts:\n"
+                f"  Cmd+{self.hotkey_start}  = Start recording\n"
+                f"  Cmd+{self.hotkey_stop}  = Stop & transcribe\n"
+                f"  Cmd+{self.hotkey_cancel}  = Cancel/abort\n\n"
                 "Menu bar shows status:\n"
                 "🎤 🇬🇧 Ready | 🔴 🇨🇿 Recording | 🧠 🇩🇪 Transcribing\n\n"
                 "Important: The flag shows your selected language.\n"

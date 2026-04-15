@@ -48,12 +48,14 @@ cd ..
 2. **Speak clearly** in your selected language
 3. **Cmd+'** - Stop recording (customizable in Settings)
    - Sees: 🧠 "Transcribing"
-4. **Wait for sound** - "Ding!" means complete
-5. **Cmd+V** - Paste transcribed text anywhere
+4. **Cmd+.** - Cancel/abort anytime (recording or transcription)
+5. **Wait for sound** - "Ding!" means complete
+6. **Cmd+V** - Paste transcribed text anywhere
 
 **⚠️ Important:** 
 - The selected language is what you **speak** - text is transcribed in that language (not translated)
 - Wait for 🧠 to change back to 🎤 and hear the sound before pasting
+- Press **Cmd+.** anytime to cancel the operation
 
 ### Menu Bar - Simple & Clean
 
@@ -62,6 +64,7 @@ Click 🎤 icon:
 **Quick Actions:**
 - **▶️ Start Recording (Cmd+;)** - Begin capture
 - **⏹️ Stop Recording (Cmd+')** - End capture
+- **❌ Cancel (Cmd+.)** - Abort recording or transcription
 
 **Language Selection:**
 - **🗣️ Current Language** - Shows active language with flag
@@ -70,7 +73,8 @@ Click 🎤 icon:
   - 🇬🇧 English, 🇨🇿 Czech, 🇩🇪 German, 🇪🇸 Spanish, 🇫🇷 French, etc.
 
 **Settings & Info:**
-- **🔊 Completion Sound** - Toggle notification (✓ = on)
+- **🔊 Completion Sound** - Toggle "ding" notification (✓ = on)
+- **🗣️ Language Announcement** - Toggle spoken language on start (✓ = on)
 - **ℹ️ About** - App info
 - **Quit Jarvis** - Exit
 
@@ -173,7 +177,7 @@ Cmd+V  → Text appears at cursor
 | **Menu Bar UI** | rumps |
 | **Hotkeys** | pynput (global keyboard listener) |
 | **Audio** | pyaudio (16kHz mono WAV) |
-| **Transcription** | whisper.cpp (auto-selects best model) |
+| **Transcription** | whisper.cpp (optimized: 8 threads, beam 3) |
 | **Workflow** | Voice → STT → Clipboard → Manual paste |
 
 **Why clipboard?** macOS blocks keyboard automation for security. Clipboard workflow is reliable and works everywhere.
@@ -193,31 +197,19 @@ Cmd+V  → Text appears at cursor
 ## Commands Reference
 
 ```bash
-./run.sh                     # Run Jarvis (with safety checks)
-./run-dev.sh                 # Quick run (no checks, for development)
-./check.sh                   # Run pre-flight checks only
-python3 test_jarvis.py       # Run unit tests
-python3 test_jarvis.py --smoke  # Run quick smoke tests
-./download-better-model.sh   # Get large-v3-turbo for better Czech
-```
-
-### Development Workflow
-
-**Before running after changes:**
-```bash
-./check.sh  # Validates everything
-```
-
-**Quick testing during development:**
-```bash
-./run-dev.sh  # Fast, no checks
-```
-
-**Run full tests:**
-```bash
-python3 test_jarvis.py
+./run.sh                     # Run Jarvis
 ```
 
 ---
 
 **Jarvis v2.1** - Simple, local, reliable voice-to-text for macOS
+
+## Performance
+
+**Optimized for speed:**
+- 8 CPU threads (uses all cores)
+- Balanced beam search (speed + quality)
+- Metal GPU acceleration (automatic on Mac)
+- Typical: 5s audio → 1-2s transcription
+
+See `SPEED-OPTIONS.md` for more optimization details.
