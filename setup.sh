@@ -28,7 +28,23 @@ if [ ! -d "whisper.cpp" ]; then
 fi
 
 cd whisper.cpp
-[ ! -f "build/bin/whisper-cli" ] && cmake -B build >/dev/null && cmake --build build --config Release >/dev/null
+
+# Rebuild if binary doesn't work or if we detect it was moved
+if [ -f "build/bin/whisper-cli" ]; then
+    # Test if binary works
+    if ! ./build/bin/whisper-cli --help &>/dev/null; then
+        echo "   Detected moved folder - rebuilding..."
+        rm -rf build
+    fi
+fi
+
+# Build if needed
+if [ ! -f "build/bin/whisper-cli" ]; then
+    echo "   Building whisper.cpp (this may take a minute)..."
+    cmake -B build >/dev/null && cmake --build build --config Release >/dev/null
+fi
+
+# Download model if needed
 [ ! -f "models/ggml-base.en.bin" ] && bash ./models/download-ggml-model.sh base.en
 cd ..
 

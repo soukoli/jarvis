@@ -6,6 +6,7 @@ Records voice, transcribes locally, copies to clipboard
 import os
 import sys
 import time
+import json
 import threading
 import subprocess
 from pynput import keyboard
@@ -27,7 +28,11 @@ class JarvisApp(rumps.App):
     """Voice assistant with menu bar UI and global hotkeys"""
 
     def __init__(self):
-        super().__init__("🎤 Jarvis", quit_button=None)
+        # Will be updated with language flag after config is loaded
+        super().__init__("🎤", quit_button=None)
+
+        # Config file path
+        self.config_file = os.path.expanduser("~/.jarvis_config.json")
 
         # Core components
         self.voice = VoiceCapture()
@@ -38,49 +43,227 @@ class JarvisApp(rumps.App):
         self.processing = False
         self._state_lock = threading.Lock()
 
-        # User preferences
-        self.completion_sound = True
+        # User preferences - load from config
+        config = self._load_config()
+        self.completion_sound = config.get('completion_sound', True)
+        self.available_devices = []
+        self.current_device_name = config.get('device_name', None)
+        self.current_language = config.get('language', 'auto')
+        self.hotkey_start = config.get('hotkey_start', ';')
+        self.hotkey_stop = config.get('hotkey_stop', "'")
+
+        # Set language in STT engine
+        self.stt.set_language(self.current_language)
+
+        # Menu items we need to update later
+        self.current_lang_menu_item = None
+        self.lang_submenu_items = []
+
+        # Get available input devices
+        self._refresh_devices()
+
+        # Apply saved device selection
+        if self.current_device_name:
+            self.voice.set_device(self.current_device_name)
+
+        # Set initial title with language flag
+        self._update_title_with_flag()
 
         # Hotkey tracking
         self.cmd_pressed = False
         self.last_key_time = 0
 
-        # Build menu
+        # Build menu - SIMPLIFIED
+        lang_submenu = self._build_language_menu()
+
+        # Store reference to current language menu item
+        lang_display = self._get_language_display(self.current_language)
+        self.current_lang_menu_item = rumps.MenuItem(f"🌍  {lang_display}", callback=None)
+
+        # Create menu items and store references
+        self.start_menu_item = rumps.MenuItem(f"▶️  Start Recording (Cmd+{self.hotkey_start})", callback=self.start_recording)
+        self.stop_menu_item = rumps.MenuItem(f"⏹️  Stop Recording (Cmd+{self.hotkey_stop})", callback=None)
+        self.sound_menu_item = rumps.MenuItem("🔊 Completion Sound", callback=self.toggle_sound)
+
+        # Build clean, simple menu
         self.menu = [
-            rumps.MenuItem("▶️  Start Recording", callback=self.start_recording),
-            rumps.MenuItem("⏹️  Stop Recording", callback=None),
+            self.start_menu_item,
+            self.stop_menu_item,
             None,
-            "Settings:",
-            rumps.MenuItem("🔊 Completion Sound", callback=self.toggle_sound),
+            "🗣️ Transcription Language:",
+            self.current_lang_menu_item,
+            (rumps.MenuItem("Change Language..."), lang_submenu),
             None,
-            "Hotkeys:",
-            "  Cmd+; = Start",
-            "  Cmd+' = Stop",
+            self.sound_menu_item,
             None,
             rumps.MenuItem("ℹ️  About", callback=self.show_about),
             None,
             rumps.MenuItem("Quit Jarvis", callback=rumps.quit_application)
         ]
 
-        # Set initial checkmarks
-        self.menu["🔊 Completion Sound"].state = 1
+        # Set initial checkmark for sound
+        self.sound_menu_item.state = 1 if self.completion_sound else 0
 
         self._print_banner()
         self._init_hotkeys()
 
+    def _load_config(self) -> dict:
+        """Load configuration from file"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Warning: Could not load config: {e}")
+        return {}
+
+    def _save_config(self):
+        """Save configuration to file"""
+        try:
+            config = {
+                'completion_sound': self.completion_sound,
+                'device_name': self.current_device_name,
+                'language': self.current_language,
+                'hotkey_start': self.hotkey_start,
+                'hotkey_stop': self.hotkey_stop
+            }
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+        except Exception as e:
+            print(f"Warning: Could not save config: {e}")
+
     def _print_banner(self):
         """Print startup banner"""
         print("\n╔════════════════════════════════════════════════════╗")
-        print("║  🎤 JARVIS VOICE ASSISTANT                        ║")
+        print("║  🎤 JARVIS VOICE ASSISTANT v2.1                   ║")
         print("╚════════════════════════════════════════════════════╝\n")
         print("Controls:")
-        print("  Cmd+;  = START recording")
-        print("  Cmd+'  = STOP recording\n")
+        print(f"  Cmd+{self.hotkey_start}  = START recording")
+        print(f"  Cmd+{self.hotkey_stop}  = STOP recording\n")
         print("Feedback:")
         print("  🔴 Menu bar → Recording")
         print("  🧠 Menu bar → Transcribing (wait!)")
         print("  🔊 Sound    → Ready to paste")
         print("  🎤 Menu bar → Back to ready\n")
+        print(f"Selected language: {self._get_language_display(self.current_language)}")
+        print(f"Model: {self.stt.get_model_info()}\n")
+
+    def _refresh_devices(self):
+        """Refresh available input devices"""
+        try:
+            self.available_devices = self.voice.get_input_devices()
+            if not self.available_devices:
+                print("Warning: No input devices found")
+        except Exception as e:
+            print(f"Error getting input devices: {e}")
+            self.available_devices = []
+
+    def _select_device(self, device):
+        """Select a microphone device"""
+        self.voice.set_device(device['name'])
+        self.current_device_name = device['name']
+
+        # Save to config
+        self._save_config()
+
+        print(f"Selected microphone: {device['name']}")
+
+    def _get_language_display(self, lang_code: str) -> str:
+        """Get display name for language code"""
+        languages = self.stt.get_available_languages()
+        for code, name in languages:
+            if code == lang_code:
+                return name
+        return lang_code
+
+    def _build_language_menu(self):
+        """Build language selection submenu"""
+        lang_items = []
+        self.lang_submenu_items = []
+
+        for code, name in self.stt.get_available_languages():
+            item = rumps.MenuItem(
+                name,
+                callback=lambda sender, c=code: self._select_language(c)
+            )
+            # Mark current language
+            if self.current_language == code:
+                item.state = 1
+            lang_items.append(item)
+            self.lang_submenu_items.append((code, item))
+
+        return lang_items
+
+    def _select_language(self, lang_code: str):
+        """Select a language"""
+        self.current_language = lang_code
+        self.stt.set_language(lang_code)
+
+        # Save to config
+        self._save_config()
+
+        # Update menu display
+        if self.current_lang_menu_item:
+            lang_display = self._get_language_display(lang_code)
+            self.current_lang_menu_item.title = f"🌍  {lang_display}"
+
+        # Update checkmarks in submenu
+        for code, item in self.lang_submenu_items:
+            item.state = 1 if code == lang_code else 0
+
+        # Update title with new language flag
+        self._update_title_with_flag()
+
+        print(f"Language set to: {lang_display}")
+
+        # Warn if using English-only model for non-English language
+        if lang_code not in ("auto", "en") and not self.stt.is_multilingual_model():
+            print(f"⚠️  Warning: Current model is English-only. Download a multilingual model for best {lang_code} results.")
+            rumps.notification(
+                title="⚠️  English-only Model",
+                subtitle=f"Selected: {lang_display}",
+                message="Go to Settings → Download Better Model for multilingual support"
+            )
+
+    def _update_title_with_flag(self, state: str = "ready"):
+        """Update menu bar title with current language flag"""
+        flag = self.stt.get_language_flag(self.current_language)
+
+        if state == "ready":
+            self.title = f"🎤 {flag}"
+        elif state == "recording":
+            self.title = f"🔴 {flag}"
+        elif state == "processing":
+            self.title = f"🧠 {flag}"
+
+    def _announce_language(self):
+        """Announce the current language with speech and play notification sound"""
+        try:
+            # Get the spoken name for the current language
+            spoken_name = self.stt.get_language_spoken_name(self.current_language)
+
+            # Only speak if there's a spoken name (not None for auto-detect)
+            if spoken_name:
+                # Use macOS 'say' command to speak the language name
+                # Run in background so it doesn't block
+                subprocess.Popen(
+                    ['say', '-v', 'Samantha', '-r', '200', spoken_name],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+
+                # Small delay to let speech start
+                time.sleep(0.3)
+
+            # Play notification sound (Tink is short and pleasant)
+            subprocess.Popen(
+                ['afplay', '/System/Library/Sounds/Tink.aiff'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except Exception as e:
+            print(f"Warning: Could not announce language: {e}", flush=True)
+            # Continue with recording even if announcement fails
 
     def _init_hotkeys(self):
         """Initialize global hotkey listener"""
@@ -98,10 +281,10 @@ class JarvisApp(rumps.App):
             if self.cmd_pressed:
                 try:
                     char = getattr(key, 'char', None)
-                    if char == ";":
+                    if char == self.hotkey_start:
                         self.last_key_time = now
                         rumps.timer(0.05)(self.start_recording)()
-                    elif char == "'":
+                    elif char == self.hotkey_stop:
                         self.last_key_time = now
                         rumps.timer(0.05)(self.stop_recording)()
                 except AttributeError:
@@ -121,10 +304,13 @@ class JarvisApp(rumps.App):
                 return
             self.recording = True
 
+        # Announce language and play notification sound
+        self._announce_language()
+
         print(f"[{time.strftime('%H:%M:%S')}] Recording started", flush=True)
-        self.title = "🔴 Recording"
-        self.menu["▶️  Start Recording"].set_callback(None)
-        self.menu["⏹️  Stop Recording"].set_callback(self.stop_recording)
+        self._update_title_with_flag("recording")
+        self.start_menu_item.set_callback(None)
+        self.stop_menu_item.set_callback(self.stop_recording)
         self.voice.start_recording()
 
     def stop_recording(self, _=None):
@@ -136,9 +322,9 @@ class JarvisApp(rumps.App):
             self.processing = True
 
         print(f"[{time.strftime('%H:%M:%S')}] Recording stopped", flush=True)
-        self.title = "🧠 Transcribing"
-        self.menu["▶️  Start Recording"].set_callback(None)
-        self.menu["⏹️  Stop Recording"].set_callback(None)
+        self._update_title_with_flag("processing")
+        self.start_menu_item.set_callback(None)
+        self.stop_menu_item.set_callback(None)
 
         audio_file = self.voice.stop_recording()
 
@@ -189,10 +375,8 @@ class JarvisApp(rumps.App):
         self.completion_sound = not self.completion_sound
         sender.state = 1 if self.completion_sound else 0
 
-        # Play sound to demonstrate if enabling
-        if self.completion_sound:
-            subprocess.run(['afplay', '/System/Library/Sounds/Glass.aiff'],
-                         timeout=2, check=False)
+        # Save to config
+        self._save_config()
 
     def _reset_state(self):
         """Reset to ready state"""
@@ -200,26 +384,27 @@ class JarvisApp(rumps.App):
             self.recording = False
             self.processing = False
 
-        self.title = "🎤 Jarvis"
-        self.menu["▶️  Start Recording"].set_callback(self.start_recording)
-        self.menu["⏹️  Stop Recording"].set_callback(None)
+        self._update_title_with_flag("ready")
+        self.start_menu_item.set_callback(self.start_recording)
+        self.stop_menu_item.set_callback(None)
 
     def show_about(self, _=None):
         """Show about dialog"""
         rumps.alert(
             title="About Jarvis",
             message=(
-                "🎤 Jarvis Voice Assistant v2.0\n\n"
-                "Local voice-to-text with clipboard workflow.\n\n"
+                "🎤 Jarvis Voice Assistant v2.1\n\n"
+                "Local voice-to-text transcription with clipboard workflow.\n\n"
                 "How it works:\n"
-                "1. Cmd+; → Recording (🔴)\n"
-                "2. Speak clearly\n"
-                "3. Cmd+' → Transcribing (🧠)\n"
-                "4. Hear 'ding' → Ready!\n"
-                "5. Cmd+V → Paste text\n\n"
+                f"1. Cmd+{self.hotkey_start} → Start recording (hear language + beep)\n"
+                "2. Speak clearly in your selected language\n"
+                f"3. Cmd+{self.hotkey_stop} → Stop & transcribe\n"
+                "4. Hear 'ding' → Text ready on clipboard\n"
+                "5. Cmd+V → Paste transcribed text anywhere\n\n"
                 "Menu bar shows status:\n"
-                "🎤 Ready | 🔴 Recording | 🧠 Transcribing\n\n"
-                "Wait for sound before pasting!"
+                "🎤 🇬🇧 Ready | 🔴 🇨🇿 Recording | 🧠 🇩🇪 Transcribing\n\n"
+                "Important: The flag shows your selected language.\n"
+                "Text is transcribed (not translated) in that language."
             )
         )
 
