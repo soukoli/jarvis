@@ -213,9 +213,11 @@ class JarvisApp(rumps.App):
         # Save to config
         self._save_config()
 
+        # Get display name (needed for logging and notification)
+        lang_display = self._get_language_display(lang_code)
+
         # Update menu display
         if self.current_lang_menu_item:
-            lang_display = self._get_language_display(lang_code)
             self.current_lang_menu_item.title = f"🌍  {lang_display}"
 
         # Update checkmarks in submenu
