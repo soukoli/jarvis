@@ -1,8 +1,32 @@
-# 🎤 Jarvis Voice Assistant
+# Jarvis Voice Assistant
 
-**Voice-to-text for macOS that works everywhere.** Speak naturally, get instant transcription on clipboard, paste anywhere.
+**Voice-to-text for macOS with Apple Silicon GPU acceleration.** Speak naturally, get instant transcription on clipboard, paste anywhere.
 
-Built with local processing (whisper.cpp) - free, private, offline.
+Built with local processing - free, private, fully offline.
+
+---
+
+## Architecture
+
+```
+Mic → PyAudio (16kHz mono)
+  → Silero VAD (voice activity detection, per-frame)
+    → Speech chunks (segmented by pauses)
+      → MLX Whisper large-v3-turbo (Apple Silicon GPU inference)
+        → Hallucination filter
+          → [Smart Cleanup?] → Ollama LLM (optional punctuation)
+            → Clipboard
+```
+
+| Component | Technology |
+|-----------|------------|
+| **Menu Bar UI** | rumps |
+| **Hotkeys** | pynput (global keyboard listener) |
+| **Audio Capture** | PyAudio (16kHz mono) |
+| **Voice Activity Detection** | Silero VAD |
+| **Transcription** | MLX Whisper large-v3-turbo (Apple Silicon GPU) |
+| **Smart Cleanup** | Ollama + llama3.1:8b (optional, local LLM) |
+| **Clipboard** | pbcopy / osascript fallback |
 
 ---
 
@@ -11,87 +35,131 @@ Built with local processing (whisper.cpp) - free, private, offline.
 ### Quick Start
 
 ```bash
-# 1. Run setup (installs dependencies and builds whisper.cpp)
-./setup.sh
-
-# 2. Run Jarvis
-./run.sh
-```
-
-**Or manually:**
-
-```bash
 # Install system dependencies
-brew install portaudio cmake
+brew install portaudio ollama
 
 # Install Python dependencies
-pip3 install pynput rumps pyaudio setproctitle
+pip3 install pynput rumps pyaudio setproctitle faster-whisper \
+    silero-vad torch numpy mlx-whisper
 
-# Build whisper.cpp
-git clone https://github.com/ggerganov/whisper.cpp.git
-cd whisper.cpp
-cmake -B build && cmake --build build --config Release
-bash ./models/download-ggml-model.sh base.en
-cd ..
+# Start Ollama (for Smart Cleanup feature)
+brew services start ollama
+ollama pull llama3.1:8b
 
 # Run Jarvis
 ./run.sh
 ```
 
+### First Run
+
+On first launch, the MLX Whisper model (~1.5GB) will be downloaded from HuggingFace. Subsequent starts load from cache (~2s).
+
 ---
 
 ## How to Use
 
-1. **Cmd+;** - Start recording (customizable in Settings)
-   - Hears: Language name spoken (e.g., "English", "Czech", "German") + beep
-   - Sees: 🔴 with language flag in menu bar
+1. **Cmd+;** - Start recording
+   - Hears: Language name spoken (e.g., "Czech") + beep
+   - Sees: Red dot with language flag in menu bar
 2. **Speak clearly** in your selected language
-3. **Cmd+'** - Stop recording (customizable in Settings)
-   - Sees: 🧠 "Transcribing"
-4. **Cmd+.** - Cancel/abort anytime (recording or transcription)
-5. **Wait for sound** - "Ding!" means complete
+3. **Cmd+'** - Stop recording
+   - Sees: Brain icon = transcribing
+4. **Cmd+.** - Cancel/abort anytime
+5. **Wait for "ding"** - text is ready
 6. **Cmd+V** - Paste transcribed text anywhere
 
-**⚠️ Important:** 
-- The selected language is what you **speak** - text is transcribed in that language (not translated)
-- Wait for 🧠 to change back to 🎤 and hear the sound before pasting
-- Press **Cmd+.** anytime to cancel the operation
+### Menu Bar Options
 
-### Menu Bar - Simple & Clean
+- **Streaming Mode** - VAD-based chunk processing (recommended)
+- **Smart Cleanup (AI)** - Adds punctuation via local LLM
+- **Completion Sound** - Toggle "ding" notification
+- **Language Announcement** - Toggle spoken language on start
+- **Change Language** - Czech, English, German, Spanish, French, etc.
 
-Click 🎤 icon:
+---
 
-**Quick Actions:**
-- **▶️ Start Recording (Cmd+;)** - Begin capture
-- **⏹️ Stop Recording (Cmd+')** - End capture
-- **❌ Cancel (Cmd+.)** - Abort recording or transcription
+## Modes
 
-**Language Selection:**
-- **🗣️ Current Language** - Shows active language with flag
-- **Change Language...** - Access language picker
-  - 🌐 Auto-detect - Works with any language
-  - 🇬🇧 English, 🇨🇿 Czech, 🇩🇪 German, 🇪🇸 Spanish, 🇫🇷 French, etc.
+### Streaming Mode (default, recommended)
 
-**Settings & Info:**
-- **🔊 Completion Sound** - Toggle "ding" notification (✓ = on)
-- **🗣️ Language Announcement** - Toggle spoken language on start (✓ = on)
-- **ℹ️ About** - App info
-- **Quit Jarvis** - Exit
+Audio is processed in real-time chunks:
+- Silero VAD detects speech segments (pauses > 600ms = segment boundary)
+- Each segment is transcribed independently via MLX Whisper
+- Results are concatenated and copied to clipboard on stop
 
-**Icon States:**
-- 🎤 🇬🇧 = Ready (with language flag)
-- 🔴 🇨🇿 = Recording in Czech
-- 🧠 🇩🇪 = Transcribing German
+**Performance:** ~1.9s inference per 5s audio chunk (Apple Silicon GPU)
 
-**When Recording Starts:**
-- Voice: Language announced (e.g., "Czech") - silent for auto-detect
-- Sound: Notification beep
-- Icon: 🔴 with language flag
+### Batch Mode (legacy fallback)
 
-**When Complete:**
-- Icon: 🧠 → 🎤 (back to ready)
-- Sound: "Ding" (if enabled)
-- Clipboard: Text ready to paste
+Records full audio to WAV file, then transcribes entire file at once via whisper.cpp CLI. Slower but available as fallback.
+
+---
+
+## Smart Cleanup (Optional)
+
+When enabled, transcribed text goes through a local LLM (Ollama) that:
+1. Removes filler words (regex: hmm, vlastne, proste, jako...)
+2. Adds punctuation and capitalization (LLM, ~2-3s)
+
+**Does NOT change your words or meaning.** Only cleans up and adds structure.
+
+Requires Ollama running: `brew services start ollama`
+
+---
+
+## Anti-Hallucination
+
+Whisper models can "hallucinate" text (especially on silence/noise). Jarvis filters:
+- Known phrases: "Titulky vytvoril JohnyX", "Dekuji za pozornost", "Subscribe", etc.
+- High no_speech_prob segments (>0.6)
+- Low confidence segments (avg_logprob < -1.0)
+- Repetitive text (same words repeated)
+
+Filtered hallucinations are logged as `[filtered hallucination]` in terminal.
+
+---
+
+## Performance
+
+| Metric | Value |
+|--------|-------|
+| **Inference engine** | MLX Whisper (Apple Silicon GPU, fp16) |
+| **Model** | large-v3-turbo (multilingual) |
+| **Speed** | ~1.9s per 5s audio chunk |
+| **Speedup vs CPU** | 3.6x faster than faster-whisper int8 |
+| **VAD latency** | ~32ms per frame |
+| **Languages** | Czech, English + 10 others |
+| **Fully offline** | Yes (after initial model download) |
+
+---
+
+## File Structure
+
+```
+jarvis-coding/
+├── jarvis.py               # Main app (GUI, hotkeys, orchestration)
+├── src/
+│   ├── streaming_stt.py    # Streaming engine (MLX Whisper + Silero VAD)
+│   ├── text_refiner.py     # Smart Cleanup (regex + Ollama)
+│   ├── speech_to_text.py   # Legacy batch mode (whisper.cpp CLI)
+│   └── voice_capture.py    # Legacy batch recording (PyAudio → WAV)
+├── run.sh                  # Launcher
+├── setup.sh                # Setup script
+└── whisper.cpp/            # Legacy whisper.cpp build (in .gitignore)
+```
+
+---
+
+## Configuration
+
+Settings stored in `~/.jarvis_config.json`:
+- `streaming_mode` - true/false
+- `smart_cleanup` - true/false
+- `completion_sound` - true/false
+- `language_announcement` - true/false
+- `language` - "cs", "en", "auto", etc.
+- `device_name` - selected microphone
+- `hotkey_start`, `hotkey_stop`, `hotkey_cancel`
 
 ---
 
@@ -102,114 +170,43 @@ Click 🎤 icon:
 1. Open **System Settings**
 2. Go to **Privacy & Security** → **Input Monitoring**
 3. Add **Terminal** (or Python)
-4. **Quit Terminal** completely (Cmd+Q)
-5. Reopen and run `./run.sh`
-
-**Without permission:**
-- Hotkeys won't work
-- Menu bar buttons still work fine!
-
----
-
-## Example Usage
-
-**In Claude Code:**
-```
-Cmd+;  → "Create a React authentication component"
-Cmd+'  → [hear "ding"]
-Cmd+V  → Text appears in chat
-```
-
-**In VS Code:**
-```
-Cmd+;  → "Add error handling for null values"
-Cmd+'  → [wait for "ding"]
-Cmd+V  → Text appears at cursor
-```
-
-**Anywhere:**
-- Browser search
-- Email
-- Slack
-- Documentation
+4. Restart Terminal and run `./run.sh`
 
 ---
 
 ## Troubleshooting
 
 **Hotkeys not working?**
-1. Grant Input Monitoring permission (see above)
-2. Verify: `ps aux | grep Jarvis` (should show process)
-3. Restart Terminal and run `./run.sh`
+- Grant Input Monitoring permission (see above)
+- Restart Terminal completely (Cmd+Q)
 
-**Poor Czech/multilingual recognition?**
-1. Go to **Settings → Download Better Model**
-2. Download `large-v3-turbo` (takes 5-10 min)
-3. Restart app to use new model
-4. See `MULTILINGUAL-IMPROVEMENTS.md` for details
+**Hallucinations ("Titulky vytvoril JohnyX")?**
+- These are filtered automatically
+- If still appearing, check terminal for `[filtered hallucination]` logs
 
-**No transcription or wrong text?**
-- Check terminal for microphone device being used
-- Select different microphone in **Settings**
-- Verify whisper: `./whisper.cpp/build/bin/whisper-cli --version`
-- Check logs for "Max amplitude" - should be >100
+**Slow first transcription?**
+- First chunk after app start loads model into GPU memory (~2s)
+- Subsequent chunks are fast (~1.9s per 5s audio)
 
-**Microphone not found after reconnecting?**
-- App saves microphone by **name**, not number
-- If unplugged, auto-switches to available device
-- Select preferred mic again in **Settings** when reconnected
-
-**Library errors after moving folder?**
-- Run `./setup.sh` again to rebuild whisper.cpp
-- Fixes dynamic library paths
-
-**Want custom hotkeys?**
-- Go to **Settings → Change Hotkeys**
-- Enter two characters (e.g., `p o` for Cmd+p / Cmd+o)
-- Restart app for changes to take effect
+**Smart Cleanup not working?**
+- Ensure Ollama is running: `brew services start ollama`
+- Check model: `ollama list` (should show llama3.1:8b)
 
 ---
 
-## Technical Details
+## Dependencies
 
-| Component | Technology |
-|-----------|------------|
-| **Menu Bar UI** | rumps |
-| **Hotkeys** | pynput (global keyboard listener) |
-| **Audio** | pyaudio (16kHz mono WAV) |
-| **Transcription** | whisper.cpp (optimized: 8 threads, beam 3) |
-| **Workflow** | Voice → STT → Clipboard → Manual paste |
-
-**Why clipboard?** macOS blocks keyboard automation for security. Clipboard workflow is reliable and works everywhere.
-
-**Model Priority:**
-1. large-v3-turbo (best for Czech/multilingual)
-2. large-v3 (highest quality)
-3. medium (good quality)
-4. base (faster, less accurate)
-
-**Storage:**
-- Recordings: `.voice_cache/` (auto-keeps last 5)
-- Settings: `~/.jarvis_config.json` (mic, language, hotkeys, sound)
+| Package | Purpose |
+|---------|---------|
+| mlx-whisper | Apple Silicon GPU inference |
+| faster-whisper | CPU fallback inference |
+| silero-vad | Voice activity detection |
+| torch | Silero VAD runtime |
+| pyaudio | Microphone capture |
+| pynput | Global hotkeys |
+| rumps | macOS menu bar UI |
+| numpy | Audio processing |
 
 ---
 
-## Commands Reference
-
-```bash
-./run.sh                     # Run Jarvis
-```
-
----
-
-**Jarvis v2.1** - Simple, local, reliable voice-to-text for macOS
-
-## Performance
-
-**Optimized for speed:**
-- 8 CPU threads (uses all cores)
-- Balanced beam search (speed + quality)
-- Metal GPU acceleration (automatic on Mac)
-- Typical: 5s audio → 1-2s transcription
-
-See `SPEED-OPTIONS.md` for more optimization details.
+**Jarvis v3.0** - Local, private, GPU-accelerated voice-to-text for macOS

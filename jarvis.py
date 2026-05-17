@@ -22,6 +22,8 @@ except ImportError:
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from voice_capture import VoiceCapture
 from speech_to_text import WhisperSTT
+from streaming_stt import StreamingSTT
+from text_refiner import TextRefiner
 
 
 class JarvisApp(rumps.App):
@@ -37,6 +39,10 @@ class JarvisApp(rumps.App):
         # Core components
         self.voice = VoiceCapture()
         self.stt = WhisperSTT()
+        self.streaming_stt = StreamingSTT(
+            on_partial=self._on_partial_transcript
+        )
+        self.refiner = TextRefiner()
 
         # State management
         self.recording = False
@@ -47,6 +53,8 @@ class JarvisApp(rumps.App):
         config = self._load_config()
         self.completion_sound = config.get('completion_sound', True)
         self.language_announcement = config.get('language_announcement', True)  # New setting
+        self.smart_cleanup = config.get('smart_cleanup', False)  # LLM text refinement
+        self.streaming_mode = config.get('streaming_mode', True)  # Streaming STT (faster)
         self.available_devices = []
         self.current_device_name = config.get('device_name', None)
         self.current_language = config.get('language', 'auto')
@@ -56,6 +64,7 @@ class JarvisApp(rumps.App):
 
         # Set language in STT engine
         self.stt.set_language(self.current_language)
+        self.streaming_stt.set_language(self.current_language)
 
         # Menu items we need to update later
         self.current_lang_menu_item = None
@@ -67,6 +76,7 @@ class JarvisApp(rumps.App):
         # Apply saved device selection
         if self.current_device_name:
             self.voice.set_device(self.current_device_name)
+            self.streaming_stt.set_device(self.current_device_name)
 
         # Set initial title with language flag
         self._update_title_with_flag()
@@ -88,6 +98,8 @@ class JarvisApp(rumps.App):
         self.cancel_menu_item = rumps.MenuItem(f"❌ Cancel (Cmd+{self.hotkey_cancel})", callback=None)
         self.sound_menu_item = rumps.MenuItem("🔊 Completion Sound", callback=self.toggle_sound)
         self.announcement_menu_item = rumps.MenuItem("🗣️ Language Announcement", callback=self.toggle_announcement)
+        self.cleanup_menu_item = rumps.MenuItem("🧹 Smart Cleanup (AI)", callback=self.toggle_cleanup)
+        self.streaming_menu_item = rumps.MenuItem("⚡ Streaming Mode (faster)", callback=self.toggle_streaming)
 
         # Build clean, simple menu
         self.menu = [
@@ -99,8 +111,10 @@ class JarvisApp(rumps.App):
             self.current_lang_menu_item,
             (rumps.MenuItem("Change Language..."), lang_submenu),
             None,
+            self.streaming_menu_item,
             self.sound_menu_item,
             self.announcement_menu_item,
+            self.cleanup_menu_item,
             None,
             rumps.MenuItem("ℹ️  About", callback=self.show_about),
             None,
@@ -110,6 +124,8 @@ class JarvisApp(rumps.App):
         # Set initial checkmarks
         self.sound_menu_item.state = 1 if self.completion_sound else 0
         self.announcement_menu_item.state = 1 if self.language_announcement else 0
+        self.cleanup_menu_item.state = 1 if self.smart_cleanup else 0
+        self.streaming_menu_item.state = 1 if self.streaming_mode else 0
 
         self._print_banner()
         self._init_hotkeys()
@@ -130,6 +146,8 @@ class JarvisApp(rumps.App):
             config = {
                 'completion_sound': self.completion_sound,
                 'language_announcement': self.language_announcement,
+                'smart_cleanup': self.smart_cleanup,
+                'streaming_mode': self.streaming_mode,
                 'device_name': self.current_device_name,
                 'language': self.current_language,
                 'hotkey_start': self.hotkey_start,
@@ -209,6 +227,7 @@ class JarvisApp(rumps.App):
         """Select a language"""
         self.current_language = lang_code
         self.stt.set_language(lang_code)
+        self.streaming_stt.set_language(lang_code)
 
         # Save to config
         self._save_config()
@@ -327,12 +346,16 @@ class JarvisApp(rumps.App):
         # Announce language and play notification sound
         self._announce_language()
 
-        print(f"[{time.strftime('%H:%M:%S')}] Recording started", flush=True)
+        print(f"[{time.strftime('%H:%M:%S')}] Recording started {'(streaming)' if self.streaming_mode else '(batch)'}", flush=True)
         self._update_title_with_flag("recording")
         self.start_menu_item.set_callback(None)
         self.stop_menu_item.set_callback(self.stop_recording)
         self.cancel_menu_item.set_callback(self.cancel_operation)
-        self.voice.start_recording()
+
+        if self.streaming_mode:
+            self.streaming_stt.start_recording()
+        else:
+            self.voice.start_recording()
 
     def stop_recording(self, _=None):
         """Stop recording and process"""
@@ -348,19 +371,92 @@ class JarvisApp(rumps.App):
         self.stop_menu_item.set_callback(None)
         self.cancel_menu_item.set_callback(self.cancel_operation)
 
-        audio_file = self.voice.stop_recording()
+        if self.streaming_mode:
+            # Streaming mode: transcript is already mostly ready
+            threading.Thread(
+                target=self._process_streaming_result,
+                daemon=True
+            ).start()
+        else:
+            # Batch mode: old behavior
+            audio_file = self.voice.stop_recording()
 
-        if not audio_file:
+            if not audio_file:
+                self._reset_state()
+                return
+
+            print(f"[{time.strftime('%H:%M:%S')}] Transcribing...", flush=True)
+            threading.Thread(
+                target=self._process_audio,
+                args=(audio_file,),
+                daemon=True
+            ).start()
+
+    def _on_partial_transcript(self, text: str):
+        """Callback for streaming partial transcripts"""
+        # Could update UI here in the future
+        pass
+
+    def _copy_to_clipboard(self, text: str):
+        """Robustly copy text to macOS clipboard"""
+        try:
+            proc = subprocess.Popen(
+                ['pbcopy'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            proc.communicate(input=text.encode('utf-8'), timeout=5)
+            print(f"[{time.strftime('%H:%M:%S')}] Copied: {text[:50]}{'...' if len(text) > 50 else ''}", flush=True)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            print(f"[{time.strftime('%H:%M:%S')}] Warning: pbcopy timeout, retrying...", flush=True)
+            # Fallback: use osascript
+            try:
+                escaped = text.replace('\\', '\\\\').replace('"', '\\"')
+                subprocess.run(
+                    ['osascript', '-e', f'set the clipboard to "{escaped}"'],
+                    timeout=3, check=False
+                )
+                print(f"[{time.strftime('%H:%M:%S')}] Copied via osascript", flush=True)
+            except Exception:
+                print(f"[{time.strftime('%H:%M:%S')}] Failed to copy to clipboard", flush=True)
+        except Exception as e:
+            print(f"[{time.strftime('%H:%M:%S')}] Clipboard error: {e}", flush=True)
+
+    def _process_streaming_result(self):
+        """Process result from streaming STT"""
+        try:
+            text = self.streaming_stt.stop_recording()
+            if not text or not text.strip():
+                print(f"[{time.strftime('%H:%M:%S')}] No transcription result", flush=True)
+                return
+
+            # Apply smart cleanup if enabled
+            if self.smart_cleanup:
+                print(f"[{time.strftime('%H:%M:%S')}] Refining with AI...", flush=True)
+                refined = self.refiner.refine(text)
+                if refined:
+                    print(f"[{time.strftime('%H:%M:%S')}] Raw:     {text[:60]}{'...' if len(text) > 60 else ''}", flush=True)
+                    print(f"[{time.strftime('%H:%M:%S')}] Refined: {refined[:60]}{'...' if len(refined) > 60 else ''}", flush=True)
+                    text = refined
+                else:
+                    print(f"[{time.strftime('%H:%M:%S')}] Refinement failed, using raw text", flush=True)
+
+            # Copy to clipboard
+            self._copy_to_clipboard(text)
+
+            # Play completion sound if enabled
+            if self.completion_sound:
+                try:
+                    subprocess.run(['afplay', '/System/Library/Sounds/Glass.aiff'],
+                                 timeout=2, check=False, stderr=subprocess.DEVNULL)
+                except:
+                    pass
+        except Exception as e:
+            print(f"[{time.strftime('%H:%M:%S')}] Error: {e}", flush=True)
+        finally:
             self._reset_state()
-            return
-
-        print(f"[{time.strftime('%H:%M:%S')}] Transcribing...", flush=True)
-        # Process in background thread
-        threading.Thread(
-            target=self._process_audio,
-            args=(audio_file,),
-            daemon=True
-        ).start()
 
     def _process_audio(self, audio_file: str):
         """Transcribe audio and copy to clipboard"""
@@ -371,9 +467,19 @@ class JarvisApp(rumps.App):
                 print(f"[{time.strftime('%H:%M:%S')}] No transcription result", flush=True)
                 return
 
+            # Apply smart cleanup if enabled
+            if self.smart_cleanup:
+                print(f"[{time.strftime('%H:%M:%S')}] Refining with AI...", flush=True)
+                refined = self.refiner.refine(text)
+                if refined:
+                    print(f"[{time.strftime('%H:%M:%S')}] Raw:     {text[:60]}{'...' if len(text) > 60 else ''}", flush=True)
+                    print(f"[{time.strftime('%H:%M:%S')}] Refined: {refined[:60]}{'...' if len(refined) > 60 else ''}", flush=True)
+                    text = refined
+                else:
+                    print(f"[{time.strftime('%H:%M:%S')}] Refinement failed, using raw text", flush=True)
+
             # Copy to clipboard
-            subprocess.run(['pbcopy'], input=text, text=True, timeout=1, check=True)
-            print(f"[{time.strftime('%H:%M:%S')}] Copied: {text[:50]}{'...' if len(text) > 50 else ''}", flush=True)
+            self._copy_to_clipboard(text)
 
             # Play completion sound if enabled
             if self.completion_sound:
@@ -404,6 +510,38 @@ class JarvisApp(rumps.App):
         sender.state = 1 if self.language_announcement else 0
         self._save_config()
 
+    def toggle_cleanup(self, sender):
+        """Toggle smart cleanup (AI text refinement)"""
+        self.smart_cleanup = not self.smart_cleanup
+        sender.state = 1 if self.smart_cleanup else 0
+        self._save_config()
+
+        if self.smart_cleanup:
+            # Check if Ollama is available
+            self.refiner.reset_availability()
+            if not self.refiner.is_available():
+                print("⚠️  Warning: Ollama not running. Start with: ollama serve", flush=True)
+                rumps.notification(
+                    title="⚠️  Ollama Not Running",
+                    subtitle="Smart Cleanup enabled but Ollama not found",
+                    message="Run 'ollama serve' in terminal to start"
+                )
+            else:
+                print("🧹 Smart Cleanup enabled (AI text refinement)", flush=True)
+        else:
+            print("🧹 Smart Cleanup disabled (raw transcription)", flush=True)
+
+    def toggle_streaming(self, sender):
+        """Toggle streaming mode (chunk-based vs batch processing)"""
+        self.streaming_mode = not self.streaming_mode
+        sender.state = 1 if self.streaming_mode else 0
+        self._save_config()
+
+        if self.streaming_mode:
+            print("⚡ Streaming mode enabled (faster, real-time processing)", flush=True)
+        else:
+            print("⚡ Streaming mode disabled (batch processing with whisper.cpp)", flush=True)
+
     def cancel_operation(self, _=None):
         """Cancel recording or transcription"""
         with self._state_lock:
@@ -419,7 +557,10 @@ class JarvisApp(rumps.App):
         # Stop voice recording if active
         if was_recording:
             try:
-                self.voice.stop_recording()
+                if self.streaming_mode:
+                    self.streaming_stt.stop_recording()
+                else:
+                    self.voice.stop_recording()
                 print(f"[{time.strftime('%H:%M:%S')}] Recording cancelled", flush=True)
             except:
                 pass
