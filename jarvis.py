@@ -23,7 +23,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from voice_capture import VoiceCapture
 from speech_to_text import WhisperSTT
 from streaming_stt import StreamingSTT
-from text_refiner import TextRefiner
 
 
 class JarvisApp(rumps.App):
@@ -42,7 +41,6 @@ class JarvisApp(rumps.App):
         self.streaming_stt = StreamingSTT(
             on_partial=self._on_partial_transcript
         )
-        self.refiner = TextRefiner()
 
         # State management
         self.recording = False
@@ -53,7 +51,6 @@ class JarvisApp(rumps.App):
         config = self._load_config()
         self.completion_sound = config.get('completion_sound', True)
         self.language_announcement = config.get('language_announcement', True)  # New setting
-        self.smart_cleanup = config.get('smart_cleanup', False)  # LLM text refinement
         self.streaming_mode = config.get('streaming_mode', True)  # Streaming STT (faster)
         self.available_devices = []
         self.current_device_name = config.get('device_name', None)
@@ -98,7 +95,6 @@ class JarvisApp(rumps.App):
         self.cancel_menu_item = rumps.MenuItem(f"❌ Cancel (Cmd+{self.hotkey_cancel})", callback=None)
         self.sound_menu_item = rumps.MenuItem("🔊 Completion Sound", callback=self.toggle_sound)
         self.announcement_menu_item = rumps.MenuItem("🗣️ Language Announcement", callback=self.toggle_announcement)
-        self.cleanup_menu_item = rumps.MenuItem("🧹 Smart Cleanup (AI)", callback=self.toggle_cleanup)
         self.streaming_menu_item = rumps.MenuItem("⚡ Streaming Mode (faster)", callback=self.toggle_streaming)
 
         # Build clean, simple menu
@@ -114,7 +110,6 @@ class JarvisApp(rumps.App):
             self.streaming_menu_item,
             self.sound_menu_item,
             self.announcement_menu_item,
-            self.cleanup_menu_item,
             None,
             rumps.MenuItem("ℹ️  About", callback=self.show_about),
             None,
@@ -124,7 +119,6 @@ class JarvisApp(rumps.App):
         # Set initial checkmarks
         self.sound_menu_item.state = 1 if self.completion_sound else 0
         self.announcement_menu_item.state = 1 if self.language_announcement else 0
-        self.cleanup_menu_item.state = 1 if self.smart_cleanup else 0
         self.streaming_menu_item.state = 1 if self.streaming_mode else 0
 
         self._print_banner()
@@ -146,7 +140,6 @@ class JarvisApp(rumps.App):
             config = {
                 'completion_sound': self.completion_sound,
                 'language_announcement': self.language_announcement,
-                'smart_cleanup': self.smart_cleanup,
                 'streaming_mode': self.streaming_mode,
                 'device_name': self.current_device_name,
                 'language': self.current_language,
@@ -432,17 +425,6 @@ class JarvisApp(rumps.App):
                 print(f"[{time.strftime('%H:%M:%S')}] No transcription result", flush=True)
                 return
 
-            # Apply smart cleanup if enabled
-            if self.smart_cleanup:
-                print(f"[{time.strftime('%H:%M:%S')}] Refining with AI...", flush=True)
-                refined = self.refiner.refine(text)
-                if refined:
-                    print(f"[{time.strftime('%H:%M:%S')}] Raw:     {text[:60]}{'...' if len(text) > 60 else ''}", flush=True)
-                    print(f"[{time.strftime('%H:%M:%S')}] Refined: {refined[:60]}{'...' if len(refined) > 60 else ''}", flush=True)
-                    text = refined
-                else:
-                    print(f"[{time.strftime('%H:%M:%S')}] Refinement failed, using raw text", flush=True)
-
             # Copy to clipboard
             self._copy_to_clipboard(text)
 
@@ -466,17 +448,6 @@ class JarvisApp(rumps.App):
             if not text or not text.strip():
                 print(f"[{time.strftime('%H:%M:%S')}] No transcription result", flush=True)
                 return
-
-            # Apply smart cleanup if enabled
-            if self.smart_cleanup:
-                print(f"[{time.strftime('%H:%M:%S')}] Refining with AI...", flush=True)
-                refined = self.refiner.refine(text)
-                if refined:
-                    print(f"[{time.strftime('%H:%M:%S')}] Raw:     {text[:60]}{'...' if len(text) > 60 else ''}", flush=True)
-                    print(f"[{time.strftime('%H:%M:%S')}] Refined: {refined[:60]}{'...' if len(refined) > 60 else ''}", flush=True)
-                    text = refined
-                else:
-                    print(f"[{time.strftime('%H:%M:%S')}] Refinement failed, using raw text", flush=True)
 
             # Copy to clipboard
             self._copy_to_clipboard(text)
@@ -509,27 +480,6 @@ class JarvisApp(rumps.App):
         self.language_announcement = not self.language_announcement
         sender.state = 1 if self.language_announcement else 0
         self._save_config()
-
-    def toggle_cleanup(self, sender):
-        """Toggle smart cleanup (AI text refinement)"""
-        self.smart_cleanup = not self.smart_cleanup
-        sender.state = 1 if self.smart_cleanup else 0
-        self._save_config()
-
-        if self.smart_cleanup:
-            # Check if Ollama is available
-            self.refiner.reset_availability()
-            if not self.refiner.is_available():
-                print("⚠️  Warning: Ollama not running. Start with: ollama serve", flush=True)
-                rumps.notification(
-                    title="⚠️  Ollama Not Running",
-                    subtitle="Smart Cleanup enabled but Ollama not found",
-                    message="Run 'ollama serve' in terminal to start"
-                )
-            else:
-                print("🧹 Smart Cleanup enabled (AI text refinement)", flush=True)
-        else:
-            print("🧹 Smart Cleanup disabled (raw transcription)", flush=True)
 
     def toggle_streaming(self, sender):
         """Toggle streaming mode (chunk-based vs batch processing)"""
