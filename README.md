@@ -1,212 +1,223 @@
-# Jarvis Voice Assistant
+<div align="center">
 
-**Voice-to-text for macOS with Apple Silicon GPU acceleration.** Speak naturally, get instant transcription on clipboard, paste anywhere.
+# Jarvis
 
-Built with local processing - free, private, fully offline.
+### Think out loud. Let your voice do the typing.
+
+Speak your thoughts naturally. Get instant text on your clipboard. Paste anywhere.
+
+Local. Private. GPU-accelerated. No cloud, no subscription, no limits.
+
+[![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-black?logo=apple)](https://support.apple.com/en-us/111902)
+[![Offline](https://img.shields.io/badge/100%25-Offline-green)](.)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12+-yellow?logo=python)](https://python.org)
+
+</div>
+
+---
+
+## Why Voice?
+
+You **think 3x faster** than you type. Every time you reach for the keyboard, you lose context. Your brain is already three sentences ahead, but your fingers are still on the first word.
+
+**Jarvis changes that.**
+
+- **Preserve the full depth of your thought.** Speaking captures nuances, context, and connections that get lost when you slow down to type.
+- **Perfect for people with vivid imagination.** If you think in rich context and big pictures, voice lets you externalize that without compression.
+- **Keep your hands free.** Code in your IDE while dictating a message. Browse documentation while describing a bug. Multitask naturally.
+- **Works everywhere.** Email, Slack, VS Code, terminal, browser - if you can paste, you can use Jarvis.
+- **No learning curve.** You already know how to talk.
+
+> *"The bottleneck isn't your thinking. It's the keyboard between your brain and the screen."*
+
+---
+
+## How It Works
+
+```
+        Cmd+;                    Cmd+'                    Cmd+V
+          |                        |                        |
+    Start speaking      Stop & transcribe            Paste anywhere
+          |                        |                        |
+    [🔴 Recording]        [🧠 Processing]          [📋 Ready]
+          |                        |
+          v                        v
+    Silero VAD              MLX Whisper
+    (detects speech)        (Apple GPU, ~2s)
+```
+
+1. Press **Cmd+;** to start recording
+2. Speak naturally in Czech or English
+3. Press **Cmd+'** to stop
+4. Wait for the "ding" sound
+5. Press **Cmd+V** to paste your transcribed text
+
+That's it. No accounts, no internet, no waiting.
+
+---
+
+## Features
+
+| | Feature | Description |
+|---|---------|-------------|
+| ⚡ | **GPU-Accelerated** | MLX Whisper on Apple Silicon - 3.6x faster than CPU |
+| 🎯 | **Streaming VAD** | Processes speech in real-time chunks, not after recording |
+| 🌍 | **Multilingual** | Czech, English + 10 more languages |
+| 🔒 | **100% Offline** | Everything runs locally. Your voice never leaves your Mac |
+| 🧹 | **Anti-Hallucination** | Filters out Whisper artifacts automatically |
+| 🎤 | **Menu Bar App** | Lives in your menu bar, always one hotkey away |
+| ⌨️ | **Global Hotkeys** | Works from any app, any context |
+| 🔊 | **Audio Feedback** | Sound notification when transcription is ready |
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- macOS with **Apple Silicon** (M1/M2/M3/M4)
+- Python 3.12+
+- [Homebrew](https://brew.sh)
+
+### Install
+
+```bash
+git clone https://github.com/soukoli/jarvis.git
+cd jarvis
+./setup.sh
+```
+
+### Run
+
+```bash
+./run.sh
+```
+
+On first run, the Whisper model (~1.5GB) downloads automatically. After that, startup takes ~2 seconds.
+
+---
+
+## Setup Details
+
+The `setup.sh` script handles everything:
+
+1. Installs system dependencies (portaudio via Homebrew)
+2. Installs Python packages (mlx-whisper, silero-vad, torch, pyaudio, pynput, rumps)
+3. Downloads the MLX Whisper large-v3-turbo model (~1.5GB, one-time)
+4. Verifies the installation
+
+### Permissions
+
+After setup, grant **Input Monitoring** permission for global hotkeys:
+
+1. Open **System Settings**
+2. Go to **Privacy & Security** → **Input Monitoring**
+3. Add **Terminal** (or your terminal app)
+4. Restart Terminal
+
+Without this permission, menu bar buttons still work - only global hotkeys require it.
+
+---
+
+## Usage
+
+### Hotkeys
+
+| Key | Action |
+|-----|--------|
+| **Cmd+;** | Start recording |
+| **Cmd+'** | Stop & transcribe |
+| **Cmd+.** | Cancel anytime |
+
+### Menu Bar
+
+Click the microphone icon to access:
+- Language selection (with flag indicator)
+- Streaming mode toggle
+- Sound & announcement settings
+
+### Icon States
+
+| Icon | State |
+|------|-------|
+| 🎤 + flag | Ready |
+| 🔴 + flag | Recording |
+| 🧠 + flag | Transcribing |
 
 ---
 
 ## Architecture
 
 ```
-Mic → PyAudio (16kHz mono)
-  → Silero VAD (voice activity detection, per-frame)
-    → Speech chunks (segmented by pauses)
-      → MLX Whisper large-v3-turbo (Apple Silicon GPU inference)
-        → Hallucination filter
-          → [Smart Cleanup?] → Ollama LLM (optional punctuation)
-            → Clipboard
+jarvis/
+├── jarvis.py               # App entry point (menu bar UI, hotkeys)
+├── src/
+│   ├── streaming_stt.py    # MLX Whisper + Silero VAD streaming engine
+│   ├── speech_to_text.py   # Batch mode fallback (whisper.cpp)
+│   └── voice_capture.py    # Batch audio recording fallback
+├── setup.sh                # One-click installer
+└── run.sh                  # Launcher
 ```
 
-| Component | Technology |
-|-----------|------------|
-| **Menu Bar UI** | rumps |
-| **Hotkeys** | pynput (global keyboard listener) |
-| **Audio Capture** | PyAudio (16kHz mono) |
-| **Voice Activity Detection** | Silero VAD |
-| **Transcription** | MLX Whisper large-v3-turbo (Apple Silicon GPU) |
-| **Smart Cleanup** | Ollama + llama3.1:8b (optional, local LLM) |
-| **Clipboard** | pbcopy / osascript fallback |
+### Tech Stack
 
----
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| Inference | MLX Whisper large-v3-turbo | Apple Silicon GPU, 3.6x faster than CPU |
+| VAD | Silero VAD | Lightweight, accurate voice detection |
+| Audio | PyAudio | Low-level mic access, 16kHz mono |
+| UI | rumps | Native macOS menu bar integration |
+| Hotkeys | pynput | System-wide keyboard capture |
 
-## Installation
-
-### Quick Start
-
-```bash
-# Install system dependencies
-brew install portaudio ollama
-
-# Install Python dependencies
-pip3 install pynput rumps pyaudio setproctitle faster-whisper \
-    silero-vad torch numpy mlx-whisper
-
-# Start Ollama (for Smart Cleanup feature)
-brew services start ollama
-ollama pull llama3.1:8b
-
-# Run Jarvis
-./run.sh
-```
-
-### First Run
-
-On first launch, the MLX Whisper model (~1.5GB) will be downloaded from HuggingFace. Subsequent starts load from cache (~2s).
-
----
-
-## How to Use
-
-1. **Cmd+;** - Start recording
-   - Hears: Language name spoken (e.g., "Czech") + beep
-   - Sees: Red dot with language flag in menu bar
-2. **Speak clearly** in your selected language
-3. **Cmd+'** - Stop recording
-   - Sees: Brain icon = transcribing
-4. **Cmd+.** - Cancel/abort anytime
-5. **Wait for "ding"** - text is ready
-6. **Cmd+V** - Paste transcribed text anywhere
-
-### Menu Bar Options
-
-- **Streaming Mode** - VAD-based chunk processing (recommended)
-- **Smart Cleanup (AI)** - Adds punctuation via local LLM
-- **Completion Sound** - Toggle "ding" notification
-- **Language Announcement** - Toggle spoken language on start
-- **Change Language** - Czech, English, German, Spanish, French, etc.
-
----
-
-## Modes
-
-### Streaming Mode (default, recommended)
-
-Audio is processed in real-time chunks:
-- Silero VAD detects speech segments (pauses > 600ms = segment boundary)
-- Each segment is transcribed independently via MLX Whisper
-- Results are concatenated and copied to clipboard on stop
-
-**Performance:** ~1.9s inference per 5s audio chunk (Apple Silicon GPU)
-
-### Batch Mode (legacy fallback)
-
-Records full audio to WAV file, then transcribes entire file at once via whisper.cpp CLI. Slower but available as fallback.
-
----
-
-## Smart Cleanup (Optional)
-
-When enabled, transcribed text goes through a local LLM (Ollama) that:
-1. Removes filler words (regex: hmm, vlastne, proste, jako...)
-2. Adds punctuation and capitalization (LLM, ~2-3s)
-
-**Does NOT change your words or meaning.** Only cleans up and adds structure.
-
-Requires Ollama running: `brew services start ollama`
-
----
-
-## Anti-Hallucination
-
-Whisper models can "hallucinate" text (especially on silence/noise). Jarvis filters:
-- Known phrases: "Titulky vytvoril JohnyX", "Dekuji za pozornost", "Subscribe", etc.
-- High no_speech_prob segments (>0.6)
-- Low confidence segments (avg_logprob < -1.0)
-- Repetitive text (same words repeated)
-
-Filtered hallucinations are logged as `[filtered hallucination]` in terminal.
-
----
-
-## Performance
+### Performance
 
 | Metric | Value |
 |--------|-------|
-| **Inference engine** | MLX Whisper (Apple Silicon GPU, fp16) |
-| **Model** | large-v3-turbo (multilingual) |
-| **Speed** | ~1.9s per 5s audio chunk |
-| **Speedup vs CPU** | 3.6x faster than faster-whisper int8 |
-| **VAD latency** | ~32ms per frame |
-| **Languages** | Czech, English + 10 others |
-| **Fully offline** | Yes (after initial model download) |
+| Inference speed | ~1.9s per 5s audio |
+| Engine | Apple Silicon GPU (Metal) |
+| Model | Whisper large-v3-turbo |
+| First load | ~2s (from disk cache) |
+| Supported languages | 12 (Czech, English, German, Spanish, French, ...) |
 
 ---
 
-## File Structure
+## Who Is This For?
 
-```
-jarvis-coding/
-├── jarvis.py               # Main app (GUI, hotkeys, orchestration)
-├── src/
-│   ├── streaming_stt.py    # Streaming engine (MLX Whisper + Silero VAD)
-│   ├── text_refiner.py     # Smart Cleanup (regex + Ollama)
-│   ├── speech_to_text.py   # Legacy batch mode (whisper.cpp CLI)
-│   └── voice_capture.py    # Legacy batch recording (PyAudio → WAV)
-├── run.sh                  # Launcher
-├── setup.sh                # Setup script
-└── whisper.cpp/            # Legacy whisper.cpp build (in .gitignore)
-```
+- **Developers** who want to dictate commit messages, code comments, or chat with AI assistants
+- **Writers** who think faster than they type
+- **Multitaskers** who want to keep hands on other tasks while capturing thoughts
+- **Anyone** who values privacy and doesn't want their voice sent to the cloud
 
 ---
 
-## Configuration
+## FAQ
 
-Settings stored in `~/.jarvis_config.json`:
-- `streaming_mode` - true/false
-- `smart_cleanup` - true/false
-- `completion_sound` - true/false
-- `language_announcement` - true/false
-- `language` - "cs", "en", "auto", etc.
-- `device_name` - selected microphone
-- `hotkey_start`, `hotkey_stop`, `hotkey_cancel`
+**Q: Does it work without internet?**
+A: Yes. 100% offline after initial model download.
 
----
+**Q: Which languages are supported?**
+A: Czech, English, German, Spanish, French, Italian, Polish, Portuguese, Russian, Slovak, Ukrainian + auto-detect.
 
-## Permission Setup
+**Q: How accurate is it?**
+A: Whisper large-v3-turbo achieves ~5-8% word error rate on clean speech. Comparable to cloud services.
 
-**Required:** Input Monitoring (for global hotkeys)
+**Q: Does it work on Intel Macs?**
+A: It falls back to CPU mode (faster-whisper). Works but ~3.6x slower.
 
-1. Open **System Settings**
-2. Go to **Privacy & Security** → **Input Monitoring**
-3. Add **Terminal** (or Python)
-4. Restart Terminal and run `./run.sh`
+**Q: Can I use it with [any app]?**
+A: If you can press Cmd+V in it, yes. It copies to clipboard - universal.
 
 ---
 
-## Troubleshooting
+## License
 
-**Hotkeys not working?**
-- Grant Input Monitoring permission (see above)
-- Restart Terminal completely (Cmd+Q)
-
-**Hallucinations ("Titulky vytvoril JohnyX")?**
-- These are filtered automatically
-- If still appearing, check terminal for `[filtered hallucination]` logs
-
-**Slow first transcription?**
-- First chunk after app start loads model into GPU memory (~2s)
-- Subsequent chunks are fast (~1.9s per 5s audio)
-
-**Smart Cleanup not working?**
-- Ensure Ollama is running: `brew services start ollama`
-- Check model: `ollama list` (should show llama3.1:8b)
+MIT
 
 ---
 
-## Dependencies
+<div align="center">
 
-| Package | Purpose |
-|---------|---------|
-| mlx-whisper | Apple Silicon GPU inference |
-| faster-whisper | CPU fallback inference |
-| silero-vad | Voice activity detection |
-| torch | Silero VAD runtime |
-| pyaudio | Microphone capture |
-| pynput | Global hotkeys |
-| rumps | macOS menu bar UI |
-| numpy | Audio processing |
+*Built for people who think faster than they type.*
 
----
-
-**Jarvis v3.0** - Local, private, GPU-accelerated voice-to-text for macOS
+</div>
