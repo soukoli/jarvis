@@ -137,7 +137,13 @@ class JarvisApp(rumps.App):
         self._init_hotkeys()
 
         # Pre-warm model in background so first recording has no cold-start delay
-        threading.Thread(target=self.streaming_stt._preload_models, daemon=True).start()
+        def _safe_preload():
+            try:
+                self.streaming_stt._preload_models()
+            except Exception as e:
+                print(f"Warning: Model preload failed: {e}", flush=True)
+
+        threading.Thread(target=_safe_preload, daemon=True).start()
 
     def _load_config(self) -> dict:
         """Load configuration from file"""
@@ -575,8 +581,8 @@ class JarvisApp(rumps.App):
                 else:
                     self.voice.stop_recording()
                 print(f"[{time.strftime('%H:%M:%S')}] Recording cancelled", flush=True)
-            except:
-                pass
+            except Exception as e:
+                print(f"[{time.strftime('%H:%M:%S')}] Warning during cancel: {e}", flush=True)
 
         if was_processing:
             print(f"[{time.strftime('%H:%M:%S')}] Transcription cancelled", flush=True)

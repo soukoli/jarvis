@@ -28,6 +28,7 @@ import torch
 # Lazy imports for heavy libraries
 _whisper_model = None
 _vad_model = None
+_model_load_lock = threading.Lock()   # Protects _whisper_model initialization
 
 # Known hallucination patterns (Whisper generates these from training data noise)
 _HALLUCINATION_PATTERNS = [
@@ -133,25 +134,27 @@ AVAILABLE_MODELS: Dict[str, Dict[str, str]] = {
 
 def _get_whisper_model(model_size: str = "large-v3-turbo", device: str = "cpu", compute_type: str = "int8"):
     """Lazy-load whisper model (MLX preferred, faster-whisper fallback).
-    Returns cached model unless model_size changed (set_model_size resets _whisper_model to None).
+    Returns cached model unless set_model_size() reset it to None.
+    Thread-safe: uses _model_load_lock to prevent duplicate loads.
     """
     global _whisper_model
-    if _whisper_model is None:
-        if _USE_MLX:
-            print(f"Using MLX Whisper: {model_size} (Apple Silicon GPU)...", flush=True)
-            _whisper_model = ("mlx", f"mlx-community/whisper-{model_size}")
-        else:
-            from faster_whisper import WhisperModel
-            print(f"Loading faster-whisper model: {model_size} ({compute_type})...", flush=True)
-            start = time.time()
-            _whisper_model = ("faster-whisper", WhisperModel(
-                model_size,
-                device=device,
-                compute_type=compute_type,
-                cpu_threads=8
-            ))
-            print(f"Model loaded in {time.time()-start:.1f}s", flush=True)
-    return _whisper_model
+    with _model_load_lock:
+        if _whisper_model is None:
+            if _USE_MLX:
+                print(f"Using MLX Whisper: {model_size} (Apple Silicon GPU)...", flush=True)
+                _whisper_model = ("mlx", f"mlx-community/whisper-{model_size}")
+            else:
+                from faster_whisper import WhisperModel
+                print(f"Loading faster-whisper model: {model_size} ({compute_type})...", flush=True)
+                start = time.time()
+                _whisper_model = ("faster-whisper", WhisperModel(
+                    model_size,
+                    device=device,
+                    compute_type=compute_type,
+                    cpu_threads=8
+                ))
+                print(f"Model loaded in {time.time()-start:.1f}s", flush=True)
+        return _whisper_model
 
 
 # Supported languages
@@ -227,13 +230,18 @@ class StreamingSTT:
             self.language = lang_code
 
     def set_model_size(self, model_size: str):
-        """Switch to a different Whisper model, unloading the current one"""
+        """Switch to a different Whisper model. Waits for in-flight transcriptions to finish."""
         global _whisper_model
-        if model_size != self.model_size:
-            self.model_size = model_size
-            with self._lock:
-                _whisper_model = None   # Force reload on next transcription
-            print(f"Model switched to: {model_size} (will load on next recording)", flush=True)
+        if model_size == self.model_size:
+            return
+        self.model_size = model_size
+        # Wait for any running transcription threads before swapping the model
+        timeout = time.time() + 10
+        while self._processing_count > 0 and time.time() < timeout:
+            time.sleep(0.05)
+        with _model_load_lock:
+            _whisper_model = None   # Force reload on next transcription
+        print(f"Model switched to: {model_size} (will load on next recording)", flush=True)
 
     def get_available_languages(self) -> List[tuple]:
         """Return list of (code, display_name) tuples"""
@@ -357,6 +365,8 @@ class StreamingSTT:
 
         if device_index is None:
             print("No input device found", flush=True)
+            self._audio.terminate()
+            self._audio = None
             self._recording = False
             return
 
@@ -424,10 +434,14 @@ class StreamingSTT:
                             is_speaking = False
 
         finally:
-            # Process any remaining speech buffer
-            if speech_buffer and len(speech_buffer) >= min_speech_frames:
+            # Process any remaining speech — always, even if shorter than min_speech_frames
+            # (avoids dropping the last word when user stops quickly)
+            if speech_buffer:
                 chunk_audio = np.concatenate(speech_buffer)
-                self._transcribe_chunk(chunk_audio)
+                if len(chunk_audio) >= min_speech_frames:
+                    self._transcribe_chunk(chunk_audio)
+                else:
+                    print(f"  [final chunk too short, skipped] {len(chunk_audio)} frames", flush=True)
 
             # Cleanup audio
             if self._stream:
@@ -442,12 +456,17 @@ class StreamingSTT:
         with self._lock:
             idx = self._chunk_counter
             self._chunk_counter += 1
-        self._processing_count += 1
-        threading.Thread(
-            target=self._do_transcribe,
-            args=(audio_data, idx),
-            daemon=True
-        ).start()
+            self._processing_count += 1   # Under lock: atomic with counter
+        try:
+            threading.Thread(
+                target=self._do_transcribe,
+                args=(audio_data, idx),
+                daemon=True
+            ).start()
+        except Exception:
+            with self._lock:
+                self._processing_count -= 1   # Thread never started, undo increment
+            raise
 
     def _do_transcribe(self, audio_data: np.ndarray, chunk_idx: int):
         """Actually perform transcription of audio chunk"""
