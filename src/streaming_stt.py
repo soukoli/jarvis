@@ -132,9 +132,11 @@ AVAILABLE_MODELS: Dict[str, Dict[str, str]] = {
 
 
 def _get_whisper_model(model_size: str = "large-v3-turbo", device: str = "cpu", compute_type: str = "int8"):
-    """Lazy-load whisper model (MLX preferred, faster-whisper fallback)"""
+    """Lazy-load whisper model (MLX preferred, faster-whisper fallback).
+    Returns cached model unless model_size changed (set_model_size resets _whisper_model to None).
+    """
     global _whisper_model
-    if _whisper_model is None or (isinstance(_whisper_model, tuple) and _whisper_model[1] != f"mlx-community/whisper-{model_size}"):
+    if _whisper_model is None:
         if _USE_MLX:
             print(f"Using MLX Whisper: {model_size} (Apple Silicon GPU)...", flush=True)
             _whisper_model = ("mlx", f"mlx-community/whisper-{model_size}")
