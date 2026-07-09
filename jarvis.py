@@ -35,14 +35,6 @@ class JarvisApp(rumps.App):
         # Config file path
         self.config_file = os.path.expanduser("~/.jarvis_config.json")
 
-        # Core components
-        self.voice = VoiceCapture()
-        self.stt = WhisperSTT()
-        self.streaming_stt = StreamingSTT(
-            model_size=self.current_model,
-            on_partial=self._on_partial_transcript
-        )
-
         # State management
         self.recording = False
         self.processing = False
@@ -51,10 +43,18 @@ class JarvisApp(rumps.App):
         # User preferences - load from config
         config = self._load_config()
         self.completion_sound = config.get('completion_sound', True)
-        self.language_announcement = config.get('language_announcement', True)  # New setting
-        self.streaming_mode = config.get('streaming_mode', True)  # Streaming STT (faster)
+        self.language_announcement = config.get('language_announcement', True)
+        self.streaming_mode = config.get('streaming_mode', True)
         self.current_model = config.get('model_size', 'large-v3-turbo')
         self.available_devices = []
+
+        # Core components (after config so current_model is available)
+        self.voice = VoiceCapture()
+        self.stt = WhisperSTT()
+        self.streaming_stt = StreamingSTT(
+            model_size=self.current_model,
+            on_partial=self._on_partial_transcript
+        )
         self.current_device_name = config.get('device_name', None)
         self.current_language = config.get('language', 'auto')
         self.hotkey_start = config.get('hotkey_start', ';')
