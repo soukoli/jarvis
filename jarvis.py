@@ -279,7 +279,7 @@ class JarvisApp(rumps.App):
             message=f"Načte se při příští nahrávce  ·  {info.get('note', '')}"
         )
 
-
+    def _select_language(self, lang_code: str):
         """Select a language"""
         self.current_language = lang_code
         self.stt.set_language(lang_code)
