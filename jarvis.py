@@ -22,7 +22,7 @@ except ImportError:
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from voice_capture import VoiceCapture
 from speech_to_text import WhisperSTT
-from streaming_stt import StreamingSTT
+from streaming_stt import StreamingSTT, AVAILABLE_MODELS
 
 
 class JarvisApp(rumps.App):
@@ -39,6 +39,7 @@ class JarvisApp(rumps.App):
         self.voice = VoiceCapture()
         self.stt = WhisperSTT()
         self.streaming_stt = StreamingSTT(
+            model_size=self.current_model,
             on_partial=self._on_partial_transcript
         )
 
@@ -52,6 +53,7 @@ class JarvisApp(rumps.App):
         self.completion_sound = config.get('completion_sound', True)
         self.language_announcement = config.get('language_announcement', True)  # New setting
         self.streaming_mode = config.get('streaming_mode', True)  # Streaming STT (faster)
+        self.current_model = config.get('model_size', 'large-v3-turbo')
         self.available_devices = []
         self.current_device_name = config.get('device_name', None)
         self.current_language = config.get('language', 'auto')
@@ -66,6 +68,7 @@ class JarvisApp(rumps.App):
         # Menu items we need to update later
         self.current_lang_menu_item = None
         self.lang_submenu_items = []
+        self.model_submenu_items = []
 
         # Get available input devices
         self._refresh_devices()
@@ -84,10 +87,15 @@ class JarvisApp(rumps.App):
 
         # Build menu - SIMPLIFIED
         lang_submenu = self._build_language_menu()
+        model_submenu = self._build_model_menu()
 
         # Store reference to current language menu item
         lang_display = self._get_language_display(self.current_language)
         self.current_lang_menu_item = rumps.MenuItem(f"🌍  {lang_display}", callback=None)
+
+        model_info = AVAILABLE_MODELS.get(self.current_model, {})
+        model_display = model_info.get("display", self.current_model)
+        self.current_model_menu_item = rumps.MenuItem(f"🤖  {model_display}", callback=None)
 
         # Create menu items and store references
         self.start_menu_item = rumps.MenuItem(f"▶️  Start Recording (Cmd+{self.hotkey_start})", callback=self.start_recording)
@@ -107,6 +115,10 @@ class JarvisApp(rumps.App):
             self.current_lang_menu_item,
             (rumps.MenuItem("Change Language..."), lang_submenu),
             None,
+            "🤖 Whisper Model:",
+            self.current_model_menu_item,
+            (rumps.MenuItem("Change Model..."), model_submenu),
+            None,
             self.streaming_menu_item,
             self.sound_menu_item,
             self.announcement_menu_item,
@@ -123,6 +135,9 @@ class JarvisApp(rumps.App):
 
         self._print_banner()
         self._init_hotkeys()
+
+        # Pre-warm model in background so first recording has no cold-start delay
+        threading.Thread(target=self.streaming_stt._preload_models, daemon=True).start()
 
     def _load_config(self) -> dict:
         """Load configuration from file"""
@@ -143,6 +158,7 @@ class JarvisApp(rumps.App):
                 'streaming_mode': self.streaming_mode,
                 'device_name': self.current_device_name,
                 'language': self.current_language,
+                'model_size': self.current_model,
                 'hotkey_start': self.hotkey_start,
                 'hotkey_stop': self.hotkey_stop,
                 'hotkey_cancel': self.hotkey_cancel
@@ -216,7 +232,54 @@ class JarvisApp(rumps.App):
 
         return lang_items
 
-    def _select_language(self, lang_code: str):
+    def _build_model_menu(self):
+        """Build model selection submenu"""
+        model_items = []
+        self.model_submenu_items = []
+
+        for model_id, info in AVAILABLE_MODELS.items():
+            label = f"{info['display']}  [{info['speed']}]"
+            if info.get('note'):
+                label += f"  · {info['note']}"
+            item = rumps.MenuItem(
+                label,
+                callback=lambda sender, m=model_id: self._select_model(m)
+            )
+            if self.current_model == model_id:
+                item.state = 1
+            model_items.append(item)
+            self.model_submenu_items.append((model_id, item))
+
+        return model_items
+
+    def _select_model(self, model_id: str):
+        """Select a Whisper model"""
+        if model_id == self.current_model:
+            return
+
+        self.current_model = model_id
+        self.streaming_stt.set_model_size(model_id)
+        self._save_config()
+
+        info = AVAILABLE_MODELS.get(model_id, {})
+        model_display = info.get("display", model_id)
+
+        # Update menu display
+        if self.current_model_menu_item:
+            self.current_model_menu_item.title = f"🤖  {model_display}"
+
+        # Update checkmarks
+        for mid, item in self.model_submenu_items:
+            item.state = 1 if mid == model_id else 0
+
+        print(f"Model switched to: {model_id} — {info.get('note', '')}")
+        rumps.notification(
+            title="Model změněn",
+            subtitle=model_display,
+            message=f"Načte se při příští nahrávce  ·  {info.get('note', '')}"
+        )
+
+
         """Select a language"""
         self.current_language = lang_code
         self.stt.set_language(lang_code)
@@ -576,7 +639,7 @@ class JarvisApp(rumps.App):
                 "  (text is transcribed, not translated)\n\n"
                 "• Press Cmd+. to cancel anytime\n\n"
                 "═══════════════════════════════\n\n"
-                f"Model: {self.stt.get_model_info()}\n"
+                f"Model: {self.streaming_stt.get_model_info()}\n"
                 f"Language: {self._get_language_display(self.current_language)}"
             )
         )
