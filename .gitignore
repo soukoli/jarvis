@@ -28,3 +28,6 @@ Info.plist
 .idea/
 
 
+
+# Agent tooling (local permissions)
+.claude/settings.local.json
