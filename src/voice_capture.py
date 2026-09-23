@@ -83,19 +83,53 @@ class VoiceCapture:
         return None
 
     def _find_valid_input_device(self) -> Optional[int]:
-        """Find valid input device - prefer selected device by name, fallback to first available"""
+        """Find valid input device.
+
+        Resolution order:
+        1. Exact match on configured device name
+        2. Case-insensitive substring match (survives renamed BT devices)
+        3. macOS default input device
+        4. First device with input channels
+        """
         audio = pyaudio.PyAudio()
         try:
-            # If a device name is selected, try to find it by name
             if self.selected_device_name:
+                target = self.selected_device_name
+                target_lower = target.lower()
+
+                # Exact match
                 for i in range(audio.get_device_count()):
                     info = audio.get_device_info_by_index(i)
-                    if info['maxInputChannels'] > 0 and info['name'] == self.selected_device_name:
+                    if info['maxInputChannels'] > 0 and info['name'] == target:
                         return i
-                # If selected device not found, print warning
-                print(f"Warning: Selected device '{self.selected_device_name}' not found, using default")
 
-            # Fallback: find first available input device
+                # Fuzzy match
+                for i in range(audio.get_device_count()):
+                    info = audio.get_device_info_by_index(i)
+                    if info['maxInputChannels'] <= 0:
+                        continue
+                    name_lower = info['name'].lower()
+                    if target_lower in name_lower or name_lower in target_lower:
+                        print(
+                            f"Device '{target}' not found exactly, "
+                            f"using close match: '{info['name']}'"
+                        )
+                        return i
+
+                print(
+                    f"Warning: Selected device '{target}' not found, "
+                    "falling back to system default input"
+                )
+
+            # Fallback to macOS system default input device
+            try:
+                default_info = audio.get_default_input_device_info()
+                if default_info.get('maxInputChannels', 0) > 0:
+                    return int(default_info['index'])
+            except Exception:
+                pass
+
+            # Last resort: first available input device
             for i in range(audio.get_device_count()):
                 info = audio.get_device_info_by_index(i)
                 if info['maxInputChannels'] > 0:
