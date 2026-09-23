@@ -41,17 +41,7 @@ echo "  ✓ portaudio"
 
 # Step 2: Python dependencies
 echo "[2/4] Installing Python packages..."
-pip3 install --quiet \
-    pynput \
-    rumps \
-    pyaudio \
-    setproctitle \
-    numpy \
-    torch \
-    torchaudio \
-    mlx-whisper \
-    faster-whisper \
-    silero-vad
+pip3 install --quiet -r "$(dirname "$0")/requirements.txt"
 echo "  ✓ All packages installed"
 
 # Step 3: Download model

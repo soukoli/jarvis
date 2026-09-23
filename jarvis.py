@@ -22,7 +22,41 @@ except ImportError:
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from voice_capture import VoiceCapture
 from speech_to_text import WhisperSTT
-from streaming_stt import StreamingSTT
+from streaming_stt import StreamingSTT, AVAILABLE_MODELS
+
+
+def _check_microphone_permission() -> str:
+    """Query macOS microphone authorization status via AVFoundation.
+
+    Returns one of: 'authorized', 'denied', 'restricted', 'not_determined',
+    'unknown'. If the query itself fails (missing pyobjc, non-macOS),
+    returns 'unknown' silently — we don't want to block startup.
+    """
+    try:
+        from AVFoundation import AVCaptureDevice, AVMediaTypeAudio
+        status = AVCaptureDevice.authorizationStatusForMediaType_(AVMediaTypeAudio)
+        return {
+            0: 'not_determined',
+            1: 'restricted',
+            2: 'denied',
+            3: 'authorized',
+        }.get(int(status), 'unknown')
+    except Exception:
+        return 'unknown'
+
+
+def _check_accessibility_permission() -> str:
+    """Query macOS accessibility (input event monitoring) status.
+
+    Returns 'authorized', 'denied', or 'unknown'. Accessibility is what
+    lets pynput observe Cmd+;/Cmd+' globally — without it, hotkeys don't
+    fire even though the recording UI still works.
+    """
+    try:
+        from ApplicationServices import AXIsProcessTrusted
+        return 'authorized' if AXIsProcessTrusted() else 'denied'
+    except Exception:
+        return 'unknown'
 
 
 class JarvisApp(rumps.App):
@@ -35,13 +69,6 @@ class JarvisApp(rumps.App):
         # Config file path
         self.config_file = os.path.expanduser("~/.jarvis_config.json")
 
-        # Core components
-        self.voice = VoiceCapture()
-        self.stt = WhisperSTT()
-        self.streaming_stt = StreamingSTT(
-            on_partial=self._on_partial_transcript
-        )
-
         # State management
         self.recording = False
         self.processing = False
@@ -50,9 +77,18 @@ class JarvisApp(rumps.App):
         # User preferences - load from config
         config = self._load_config()
         self.completion_sound = config.get('completion_sound', True)
-        self.language_announcement = config.get('language_announcement', True)  # New setting
-        self.streaming_mode = config.get('streaming_mode', True)  # Streaming STT (faster)
+        self.language_announcement = config.get('language_announcement', True)
+        self.streaming_mode = config.get('streaming_mode', True)
+        self.current_model = config.get('model_size', 'large-v3-turbo')
         self.available_devices = []
+
+        # Core components (after config so current_model is available)
+        self.voice = VoiceCapture()
+        self.stt = WhisperSTT()
+        self.streaming_stt = StreamingSTT(
+            model_size=self.current_model,
+            on_partial=self._on_partial_transcript
+        )
         self.current_device_name = config.get('device_name', None)
         self.current_language = config.get('language', 'auto')
         self.hotkey_start = config.get('hotkey_start', ';')
@@ -66,6 +102,7 @@ class JarvisApp(rumps.App):
         # Menu items we need to update later
         self.current_lang_menu_item = None
         self.lang_submenu_items = []
+        self.model_submenu_items = []
 
         # Get available input devices
         self._refresh_devices()
@@ -75,19 +112,32 @@ class JarvisApp(rumps.App):
             self.voice.set_device(self.current_device_name)
             self.streaming_stt.set_device(self.current_device_name)
 
-        # Set initial title with language flag
-        self._update_title_with_flag()
-
         # Hotkey tracking
         self.cmd_pressed = False
         self.last_key_time = 0
 
+        # Permission warnings — must be populated BEFORE the first
+        # _update_title_with_flag() call, because the title reflects
+        # the warning state (⚠️ vs 🎤).
+        self.mic_permission = 'unknown'
+        self.accessibility_permission = 'unknown'
+        self.permission_warnings: list = []
+        self._refresh_permissions()
+
+        # Set initial title with language flag (respects warning state)
+        self._update_title_with_flag()
+
         # Build menu - SIMPLIFIED
         lang_submenu = self._build_language_menu()
+        model_submenu = self._build_model_menu()
 
         # Store reference to current language menu item
         lang_display = self._get_language_display(self.current_language)
         self.current_lang_menu_item = rumps.MenuItem(f"🌍  {lang_display}", callback=None)
+
+        model_info = AVAILABLE_MODELS.get(self.current_model, {})
+        model_display = model_info.get("display", self.current_model)
+        self.current_model_menu_item = rumps.MenuItem(f"🤖  {model_display}", callback=None)
 
         # Create menu items and store references
         self.start_menu_item = rumps.MenuItem(f"▶️  Start Recording (Cmd+{self.hotkey_start})", callback=self.start_recording)
@@ -97,8 +147,21 @@ class JarvisApp(rumps.App):
         self.announcement_menu_item = rumps.MenuItem("🗣️ Language Announcement", callback=self.toggle_announcement)
         self.streaming_menu_item = rumps.MenuItem("⚡ Streaming Mode (faster)", callback=self.toggle_streaming)
 
+        # Warning menu item — visible only when there is an active issue
+        self.warning_menu_item = rumps.MenuItem(
+            "⚠️  Permission issues — click for details",
+            callback=self.show_permission_warning,
+        )
+        self.recheck_menu_item = rumps.MenuItem(
+            "🔄 Recheck permissions",
+            callback=self.recheck_permissions,
+        )
+
         # Build clean, simple menu
         self.menu = [
+            self.warning_menu_item,
+            self.recheck_menu_item,
+            None,
             self.start_menu_item,
             self.stop_menu_item,
             self.cancel_menu_item,
@@ -106,6 +169,10 @@ class JarvisApp(rumps.App):
             "🗣️ Transcription Language:",
             self.current_lang_menu_item,
             (rumps.MenuItem("Change Language..."), lang_submenu),
+            None,
+            "🤖 Whisper Model:",
+            self.current_model_menu_item,
+            (rumps.MenuItem("Change Model..."), model_submenu),
             None,
             self.streaming_menu_item,
             self.sound_menu_item,
@@ -121,8 +188,35 @@ class JarvisApp(rumps.App):
         self.announcement_menu_item.state = 1 if self.language_announcement else 0
         self.streaming_menu_item.state = 1 if self.streaming_mode else 0
 
+        # Show/hide warning items based on current permission state
+        self._apply_permission_state_to_menu()
+
         self._print_banner()
         self._init_hotkeys()
+
+        # Pre-warm model in background so first recording has no cold-start delay
+        def _safe_preload():
+            try:
+                self.streaming_stt._preload_models()
+            except Exception as e:
+                print(f"Warning: Model preload failed: {e}", flush=True)
+
+        threading.Thread(target=_safe_preload, daemon=True).start()
+
+        # Surface permission problems via native notification too, so the
+        # user sees the warning even if they never open the menu.
+        if self.permission_warnings:
+            count = len(self.permission_warnings)
+            plural = 's' if count > 1 else ''
+            first = self.permission_warnings[0]['title']
+            rumps.notification(
+                title="⚠️  Jarvis — permission issue" + plural,
+                subtitle=first,
+                message=(
+                    f"{count} issue{plural} detected. Click ⚠️ in the menu bar "
+                    "for details and a link to System Settings."
+                ),
+            )
 
     def _load_config(self) -> dict:
         """Load configuration from file"""
@@ -143,6 +237,7 @@ class JarvisApp(rumps.App):
                 'streaming_mode': self.streaming_mode,
                 'device_name': self.current_device_name,
                 'language': self.current_language,
+                'model_size': self.current_model,
                 'hotkey_start': self.hotkey_start,
                 'hotkey_stop': self.hotkey_stop,
                 'hotkey_cancel': self.hotkey_cancel
@@ -169,6 +264,18 @@ class JarvisApp(rumps.App):
         print("  🎤 Menu bar → Back to ready\n")
         print(f"Selected language: {self._get_language_display(self.current_language)}")
         print(f"Model: {self.stt.get_model_info()}\n")
+
+        # Console mirror of the menu-bar warning: everything listed in
+        # self.permission_warnings (populated by _refresh_permissions()).
+        if self.permission_warnings:
+            print("╔════════════════════════════════════════════════════╗")
+            print("║  ⚠️  PERMISSION ISSUES DETECTED                    ║")
+            print("╚════════════════════════════════════════════════════╝")
+            for i, w in enumerate(self.permission_warnings, 1):
+                print(f"\n{i}. {w['title']}")
+                print(f"   {w['detail']}")
+                print(f"   Fix: {w['fix']}")
+            print("\nSee the ⚠️ item in the menu bar for a clickable version.\n")
 
     def _refresh_devices(self):
         """Refresh available input devices"""
@@ -216,6 +323,53 @@ class JarvisApp(rumps.App):
 
         return lang_items
 
+    def _build_model_menu(self):
+        """Build model selection submenu"""
+        model_items = []
+        self.model_submenu_items = []
+
+        for model_id, info in AVAILABLE_MODELS.items():
+            label = f"{info['display']}  [{info['speed']}]"
+            if info.get('note'):
+                label += f"  · {info['note']}"
+            item = rumps.MenuItem(
+                label,
+                callback=lambda sender, m=model_id: self._select_model(m)
+            )
+            if self.current_model == model_id:
+                item.state = 1
+            model_items.append(item)
+            self.model_submenu_items.append((model_id, item))
+
+        return model_items
+
+    def _select_model(self, model_id: str):
+        """Select a Whisper model"""
+        if model_id == self.current_model:
+            return
+
+        self.current_model = model_id
+        self.streaming_stt.set_model_size(model_id)
+        self._save_config()
+
+        info = AVAILABLE_MODELS.get(model_id, {})
+        model_display = info.get("display", model_id)
+
+        # Update menu display
+        if self.current_model_menu_item:
+            self.current_model_menu_item.title = f"🤖  {model_display}"
+
+        # Update checkmarks
+        for mid, item in self.model_submenu_items:
+            item.state = 1 if mid == model_id else 0
+
+        print(f"Model switched to: {model_id} — {info.get('note', '')}")
+        rumps.notification(
+            title="Model změněn",
+            subtitle=model_display,
+            message=f"Načte se při příští nahrávce  ·  {info.get('note', '')}"
+        )
+
     def _select_language(self, lang_code: str):
         """Select a language"""
         self.current_language = lang_code
@@ -250,12 +404,178 @@ class JarvisApp(rumps.App):
                 message="Go to Settings → Download Better Model for multilingual support"
             )
 
+    def _refresh_permissions(self):
+        """Refresh cached permission status and build the warnings list.
+
+        Populates:
+          self.mic_permission           — result of _check_microphone_permission()
+          self.accessibility_permission — result of _check_accessibility_permission()
+          self.permission_warnings      — list of {title, detail, fix, pane}
+                                          for every non-authorized permission
+        """
+        self.mic_permission = _check_microphone_permission()
+        self.accessibility_permission = _check_accessibility_permission()
+
+        warnings = []
+
+        if self.mic_permission == 'denied':
+            warnings.append({
+                'title': '🎙️ Microphone access denied',
+                'detail': (
+                    'macOS has blocked microphone access for the app that '
+                    'launched Jarvis. Recording will produce silence and no '
+                    'transcription will ever appear.'
+                ),
+                'fix': (
+                    'System Settings → Privacy & Security → Microphone → '
+                    'enable your terminal (Terminal, iTerm, opencode, etc.) '
+                    'and restart it.'
+                ),
+                'pane': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+            })
+        elif self.mic_permission == 'not_determined':
+            warnings.append({
+                'title': '🎙️ Microphone permission not yet granted',
+                'detail': 'macOS will prompt on the first recording attempt.',
+                'fix': 'Start a recording once, then click "Allow" in the prompt.',
+                'pane': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+            })
+        elif self.mic_permission == 'restricted':
+            warnings.append({
+                'title': '🎙️ Microphone access restricted',
+                'detail': 'System policy (parental controls / MDM) blocks microphone use.',
+                'fix': 'Contact your administrator or check parental controls.',
+                'pane': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+            })
+
+        if self.accessibility_permission == 'denied':
+            warnings.append({
+                'title': '⌨️ Accessibility access denied',
+                'detail': (
+                    "Global hotkeys (Cmd+;, Cmd+', Cmd+.) will not work. "
+                    'You can still use the menu items, but the keyboard '
+                    'shortcuts are dead until this is fixed.'
+                ),
+                'fix': (
+                    'System Settings → Privacy & Security → Accessibility → '
+                    'enable your terminal (Terminal, iTerm, opencode, etc.) '
+                    'and restart it.'
+                ),
+                'pane': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility',
+            })
+
+        self.permission_warnings = warnings
+
+    def _apply_permission_state_to_menu(self):
+        """Show/hide the warning menu items based on current warnings list.
+
+        rumps doesn't support hiding menu items after construction, so we
+        instead retitle them: when there are no warnings, the row becomes
+        a compact ✅ status line users can ignore. This keeps the menu
+        layout stable across permission changes.
+        """
+        if self.permission_warnings:
+            count = len(self.permission_warnings)
+            plural = 's' if count > 1 else ''
+            self.warning_menu_item.title = f"⚠️  {count} permission issue{plural} — click for details"
+            self.warning_menu_item.set_callback(self.show_permission_warning)
+        else:
+            self.warning_menu_item.title = "✅ Permissions OK"
+            # Disable click when everything is fine (grays out the row)
+            self.warning_menu_item.set_callback(None)
+
+    def recheck_permissions(self, _=None):
+        """Re-query TCC after the user (hopefully) toggled permissions."""
+        old_warnings = len(self.permission_warnings)
+        self._refresh_permissions()
+        self._apply_permission_state_to_menu()
+
+        # Refresh title only when idle — don't clobber a recording indicator
+        if not self.recording and not self.processing:
+            self._update_title_with_flag("ready")
+
+        new_warnings = len(self.permission_warnings)
+        if new_warnings == 0:
+            rumps.notification(
+                title="Jarvis",
+                subtitle="✅ Permissions OK",
+                message="All required permissions are granted."
+            )
+        elif new_warnings < old_warnings:
+            rumps.notification(
+                title="Jarvis",
+                subtitle=f"{old_warnings - new_warnings} issue(s) resolved",
+                message=f"{new_warnings} still pending."
+            )
+        else:
+            rumps.notification(
+                title="Jarvis",
+                subtitle=f"⚠️ {new_warnings} permission issue(s)",
+                message="Click the warning in the menu for details."
+            )
+
+    def show_permission_warning(self, _=None):
+        """Show a dialog listing every active permission problem, with
+        a button that jumps straight to the relevant System Settings pane."""
+        if not self.permission_warnings:
+            return
+
+        # Bring the app forward so the dialog isn't hidden behind others
+        try:
+            subprocess.run(
+                ['osascript', '-e',
+                 f'tell application "System Events" to set frontmost of '
+                 f'first process whose unix id is {os.getpid()} to true'],
+                capture_output=True,
+                timeout=1,
+            )
+        except Exception:
+            pass
+
+        # Build a single readable message
+        lines = []
+        for i, w in enumerate(self.permission_warnings, 1):
+            lines.append(f"{i}. {w['title']}")
+            lines.append(f"   {w['detail']}")
+            lines.append(f"   Fix: {w['fix']}")
+            lines.append("")
+
+        response = rumps.alert(
+            title="⚠️  Permission Issues",
+            message="\n".join(lines).rstrip(),
+            ok="Open System Settings",
+            cancel="Close",
+        )
+
+        # rumps.alert returns 1 for OK, 0 for Cancel
+        if response == 1:
+            # Open the first affected pane; user can navigate to others manually
+            pane = self.permission_warnings[0].get('pane')
+            if pane:
+                try:
+                    subprocess.Popen(
+                        ['open', pane],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                except Exception as e:
+                    print(f"Could not open System Settings: {e}", flush=True)
+
     def _update_title_with_flag(self, state: str = "ready"):
-        """Update menu bar title with current language flag"""
+        """Update menu bar title with current language flag.
+
+        When permission warnings are active AND the app is idle (ready),
+        the title shows ⚠️ instead of 🎤 so the problem is visible at a
+        glance in the menu bar. During recording/processing the state
+        emoji takes priority so the user still sees what's happening.
+        """
         flag = self.stt.get_language_flag(self.current_language)
 
         if state == "ready":
-            self.title = f"🎤 {flag}"
+            if self.permission_warnings:
+                self.title = f"⚠️ {flag}"
+            else:
+                self.title = f"🎤 {flag}"
         elif state == "recording":
             self.title = f"🔴 {flag}"
         elif state == "processing":
@@ -512,8 +832,8 @@ class JarvisApp(rumps.App):
                 else:
                     self.voice.stop_recording()
                 print(f"[{time.strftime('%H:%M:%S')}] Recording cancelled", flush=True)
-            except:
-                pass
+            except Exception as e:
+                print(f"[{time.strftime('%H:%M:%S')}] Warning during cancel: {e}", flush=True)
 
         if was_processing:
             print(f"[{time.strftime('%H:%M:%S')}] Transcription cancelled", flush=True)
@@ -576,7 +896,7 @@ class JarvisApp(rumps.App):
                 "  (text is transcribed, not translated)\n\n"
                 "• Press Cmd+. to cancel anytime\n\n"
                 "═══════════════════════════════\n\n"
-                f"Model: {self.stt.get_model_info()}\n"
+                f"Model: {self.streaming_stt.get_model_info()}\n"
                 f"Language: {self._get_language_display(self.current_language)}"
             )
         )

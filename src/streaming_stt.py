@@ -5,7 +5,7 @@ Processes audio in chunks for near-realtime transcription.
 
 Architecture:
     Mic → PyAudio → VAD (speech detection) → Buffer chunks → faster-whisper → text
-    
+
 Benefits over whisper.cpp CLI:
     - Streaming: process while recording, don't wait for full file
     - VAD: smart segmentation by speech pauses (not fixed time)
@@ -19,7 +19,7 @@ import time
 import wave
 import threading
 import numpy as np
-from typing import Optional, List, Callable
+from typing import Optional, List, Dict, Callable
 from collections import deque
 
 import pyaudio
@@ -28,6 +28,7 @@ import torch
 # Lazy imports for heavy libraries
 _whisper_model = None
 _vad_model = None
+_model_load_lock = threading.Lock()   # Protects _whisper_model initialization
 
 # Known hallucination patterns (Whisper generates these from training data noise)
 _HALLUCINATION_PATTERNS = [
@@ -53,14 +54,35 @@ def _is_hallucination(text: str) -> bool:
     if not text or not text.strip():
         return True
     cleaned = _HALLUCINATION_RE.sub("", text).strip()
-    # If after removing hallucination patterns almost nothing remains, it's a hallucination
     if len(cleaned) < 3:
         return True
-    # Repetitive text (same word/phrase repeated) is also hallucination
-    words = cleaned.split()
+
+    words = cleaned.lower().split()
+
+    # Too few unique words relative to total (ratio-based — catches "elected elected elected...")
+    if len(words) >= 6 and len(set(words)) / len(words) < 0.35:
+        return True
+
+    # Legacy strict check for very short repetitive text
     if len(words) >= 4 and len(set(words)) <= 2:
         return True
+
+    # Bigram repetition — catches phrase loops like "I think I think I think"
+    bigrams = list(zip(words, words[1:]))
+    if len(bigrams) >= 4 and len(set(bigrams)) / len(bigrams) < 0.5:
+        return True
+
     return False
+
+
+def _is_near_duplicate(a: str, b: str) -> bool:
+    """True if two chunks are >80% word overlap (catches Whisper re-emitting same segment)"""
+    a_words = set(a.lower().split())
+    b_words = set(b.lower().split())
+    if not a_words or not b_words or min(len(a_words), len(b_words)) < 4:
+        return False
+    overlap = len(a_words & b_words) / min(len(a_words), len(b_words))
+    return overlap > 0.8
 
 
 def _get_vad_model():
@@ -81,26 +103,58 @@ except ImportError:
     _mlx_whisper = None
 
 
+# Available models with display info
+AVAILABLE_MODELS: Dict[str, Dict[str, str]] = {
+    "large-v3-turbo": {
+        "display": "large-v3-turbo — 1.5 GB, nejlepší přesnost",
+        "size": "1.5 GB",
+        "speed": "~2s",
+        "note": "Doporučeno",
+    },
+    "large-v3-turbo-q4": {
+        "display": "large-v3-turbo-q4 — 380 MB, rychlý",
+        "size": "380 MB",
+        "speed": "~1.5s",
+        "note": "4-bit kvantizace, skoro stejná přesnost",
+    },
+    "medium": {
+        "display": "medium — 500 MB, vyvážený",
+        "size": "500 MB",
+        "speed": "~1s",
+        "note": "Rychlejší, mírně nižší přesnost",
+    },
+    "small": {
+        "display": "small — 150 MB, nejrychlejší",
+        "size": "150 MB",
+        "speed": "<1s",
+        "note": "Vhodné pro krátké vstupy",
+    },
+}
+
+
 def _get_whisper_model(model_size: str = "large-v3-turbo", device: str = "cpu", compute_type: str = "int8"):
-    """Lazy-load whisper model (MLX preferred, faster-whisper fallback)"""
+    """Lazy-load whisper model (MLX preferred, faster-whisper fallback).
+    Returns cached model unless set_model_size() reset it to None.
+    Thread-safe: uses _model_load_lock to prevent duplicate loads.
+    """
     global _whisper_model
-    if _whisper_model is None:
-        if _USE_MLX:
-            # MLX: just store the model repo path, actual model loads on first transcribe call
-            print(f"Using MLX Whisper: {model_size} (Apple Silicon GPU)...", flush=True)
-            _whisper_model = ("mlx", f"mlx-community/whisper-{model_size}")
-        else:
-            from faster_whisper import WhisperModel
-            print(f"Loading faster-whisper model: {model_size} ({compute_type})...", flush=True)
-            start = time.time()
-            _whisper_model = ("faster-whisper", WhisperModel(
-                model_size,
-                device=device,
-                compute_type=compute_type,
-                cpu_threads=8
-            ))
-            print(f"Model loaded in {time.time()-start:.1f}s", flush=True)
-    return _whisper_model
+    with _model_load_lock:
+        if _whisper_model is None:
+            if _USE_MLX:
+                print(f"Using MLX Whisper: {model_size} (Apple Silicon GPU)...", flush=True)
+                _whisper_model = ("mlx", f"mlx-community/whisper-{model_size}")
+            else:
+                from faster_whisper import WhisperModel
+                print(f"Loading faster-whisper model: {model_size} ({compute_type})...", flush=True)
+                start = time.time()
+                _whisper_model = ("faster-whisper", WhisperModel(
+                    model_size,
+                    device=device,
+                    compute_type=compute_type,
+                    cpu_threads=8
+                ))
+                print(f"Model loaded in {time.time()-start:.1f}s", flush=True)
+        return _whisper_model
 
 
 # Supported languages
@@ -162,7 +216,8 @@ class StreamingSTT:
         self._audio = None
         self._stream = None
         self._thread = None
-        self._transcripts: List[str] = []
+        self._transcripts: Dict[int, str] = {}   # Keyed by chunk index for ordered assembly
+        self._chunk_counter = 0
         self._lock = threading.Lock()
         self._processing_count = 0
 
@@ -173,6 +228,20 @@ class StreamingSTT:
         """Set transcription language"""
         if lang_code in SUPPORTED_LANGUAGES:
             self.language = lang_code
+
+    def set_model_size(self, model_size: str):
+        """Switch to a different Whisper model. Waits for in-flight transcriptions to finish."""
+        global _whisper_model
+        if model_size == self.model_size:
+            return
+        self.model_size = model_size
+        # Wait for any running transcription threads before swapping the model
+        timeout = time.time() + 10
+        while self._processing_count > 0 and time.time() < timeout:
+            time.sleep(0.05)
+        with _model_load_lock:
+            _whisper_model = None   # Force reload on next transcription
+        print(f"Model switched to: {model_size} (will load on next recording)", flush=True)
 
     def get_available_languages(self) -> List[tuple]:
         """Return list of (code, display_name) tuples"""
@@ -194,7 +263,9 @@ class StreamingSTT:
     def get_model_info(self) -> str:
         """Return info about current model"""
         backend = "MLX/Apple GPU" if _USE_MLX else "faster-whisper/CPU"
-        return f"{self.model_size} ({backend}, streaming)"
+        model_info = AVAILABLE_MODELS.get(self.model_size, {})
+        size = model_info.get("size", "?")
+        return f"{self.model_size} ({backend}, {size})"
 
     def set_device(self, device_name: str):
         """Set input device by name"""
@@ -219,17 +290,60 @@ class StreamingSTT:
         return devices
 
     def _find_device_index(self) -> Optional[int]:
-        """Find device index for selected device"""
+        """Find device index for selected device.
+
+        Resolution order:
+        1. Exact match on configured device name
+        2. Case-insensitive substring match (survives renamed BT devices)
+        3. macOS default input device
+        4. First device with input channels
+        """
         audio = pyaudio.PyAudio()
         try:
             if self._selected_device_name:
+                target = self._selected_device_name
+                target_lower = target.lower()
+
+                # Exact match
                 for i in range(audio.get_device_count()):
                     info = audio.get_device_info_by_index(i)
-                    if info['maxInputChannels'] > 0 and info['name'] == self._selected_device_name:
+                    if info['maxInputChannels'] > 0 and info['name'] == target:
                         return i
-                print(f"Warning: Device '{self._selected_device_name}' not found, using default", flush=True)
 
-            # Fallback to first available
+                # Fuzzy match (case-insensitive substring, either direction)
+                for i in range(audio.get_device_count()):
+                    info = audio.get_device_info_by_index(i)
+                    if info['maxInputChannels'] <= 0:
+                        continue
+                    name_lower = info['name'].lower()
+                    if target_lower in name_lower or name_lower in target_lower:
+                        print(
+                            f"Device '{target}' not found exactly, "
+                            f"using close match: '{info['name']}'",
+                            flush=True,
+                        )
+                        return i
+
+                print(
+                    f"Warning: Device '{target}' not found, "
+                    "falling back to system default input",
+                    flush=True,
+                )
+
+            # Fallback to macOS system default input device
+            try:
+                default_info = audio.get_default_input_device_info()
+                if default_info.get('maxInputChannels', 0) > 0:
+                    print(
+                        f"Using default input device: '{default_info['name']}' "
+                        f"(index {default_info['index']})",
+                        flush=True,
+                    )
+                    return int(default_info['index'])
+            except Exception:
+                pass
+
+            # Last resort: first device with input channels
             for i in range(audio.get_device_count()):
                 info = audio.get_device_info_by_index(i)
                 if info['maxInputChannels'] > 0:
@@ -244,7 +358,8 @@ class StreamingSTT:
             return
 
         self._recording = True
-        self._transcripts = []
+        self._transcripts = {}
+        self._chunk_counter = 0
         self._processing_count = 0
 
         # Pre-load models in background (first call only)
@@ -270,9 +385,9 @@ class StreamingSTT:
         while self._processing_count > 0 and time.time() < timeout:
             time.sleep(0.1)
 
-        # Join all partial transcripts
+        # Assemble chunks in order
         with self._lock:
-            full_text = " ".join(t for t in self._transcripts if t.strip())
+            full_text = " ".join(self._transcripts[k] for k in sorted(self._transcripts) if self._transcripts[k].strip())
 
         return full_text.strip() if full_text.strip() else None
 
@@ -293,8 +408,19 @@ class StreamingSTT:
 
         if device_index is None:
             print("No input device found", flush=True)
+            self._audio.terminate()
+            self._audio = None
             self._recording = False
             return
+
+        try:
+            device_info = self._audio.get_device_info_by_index(device_index)
+            print(
+                f"Using device: {device_info['name']} (index {device_index})",
+                flush=True,
+            )
+        except Exception:
+            pass
 
         try:
             self._stream = self._audio.open(
@@ -317,7 +443,14 @@ class StreamingSTT:
         speech_buffer = []          # Accumulate speech frames
         silence_frames = 0          # Count consecutive silence frames
         is_speaking = False         # Currently in speech segment
-        
+
+        # Silent-input detection (catches macOS mic permission denial —
+        # PyAudio opens the stream but delivers all-zero buffers)
+        frames_seen = 0
+        silent_frames = 0
+        silence_check_frames = int(2.0 * self.sample_rate / self.chunk_size)  # ~2s at 16kHz
+        silence_alerted = False
+
         frames_per_ms = self.sample_rate / 1000
         silence_frames_threshold = int(self.min_silence_ms * frames_per_ms / self.chunk_size)
         min_speech_frames = int(self.min_speech_ms * frames_per_ms / self.chunk_size)
@@ -332,6 +465,22 @@ class StreamingSTT:
                 # Convert to float32 for VAD
                 audio_int16 = np.frombuffer(raw_data, dtype=np.int16)
                 audio_float = audio_int16.astype(np.float32) / 32768.0
+
+                # Silent-input detection: count frames that are literally all zero
+                frames_seen += 1
+                if not audio_int16.any():
+                    silent_frames += 1
+                if (not silence_alerted
+                        and frames_seen >= silence_check_frames
+                        and silent_frames >= silence_check_frames * 0.95):
+                    silence_alerted = True
+                    print(
+                        "⚠️  Microphone is delivering silence (all-zero samples).\n"
+                        "   Most likely cause: macOS Microphone permission is DENIED\n"
+                        "   for the app that launched Jarvis (Terminal / iTerm / opencode).\n"
+                        "   Fix: System Settings → Privacy & Security → Microphone → enable it.",
+                        flush=True,
+                    )
 
                 # Run VAD
                 audio_tensor = torch.from_numpy(audio_float)
@@ -360,10 +509,14 @@ class StreamingSTT:
                             is_speaking = False
 
         finally:
-            # Process any remaining speech buffer
-            if speech_buffer and len(speech_buffer) >= min_speech_frames:
+            # Process any remaining speech — always, even if shorter than min_speech_frames
+            # (avoids dropping the last word when user stops quickly)
+            if speech_buffer:
                 chunk_audio = np.concatenate(speech_buffer)
-                self._transcribe_chunk(chunk_audio)
+                if len(chunk_audio) >= min_speech_frames:
+                    self._transcribe_chunk(chunk_audio)
+                else:
+                    print(f"  [final chunk too short, skipped] {len(chunk_audio)} frames", flush=True)
 
             # Cleanup audio
             if self._stream:
@@ -375,14 +528,22 @@ class StreamingSTT:
 
     def _transcribe_chunk(self, audio_data: np.ndarray):
         """Transcribe a chunk of audio in background thread"""
-        self._processing_count += 1
-        threading.Thread(
-            target=self._do_transcribe,
-            args=(audio_data,),
-            daemon=True
-        ).start()
+        with self._lock:
+            idx = self._chunk_counter
+            self._chunk_counter += 1
+            self._processing_count += 1   # Under lock: atomic with counter
+        try:
+            threading.Thread(
+                target=self._do_transcribe,
+                args=(audio_data, idx),
+                daemon=True
+            ).start()
+        except Exception:
+            with self._lock:
+                self._processing_count -= 1   # Thread never started, undo increment
+            raise
 
-    def _do_transcribe(self, audio_data: np.ndarray):
+    def _do_transcribe(self, audio_data: np.ndarray, chunk_idx: int):
         """Actually perform transcription of audio chunk"""
         try:
             backend, model = _get_whisper_model(self.model_size)
@@ -439,12 +600,19 @@ class StreamingSTT:
 
                 if chunk_text:
                     with self._lock:
-                        self._transcripts.append(chunk_text)
+                        # Cross-chunk near-duplicate detection
+                        if self._transcripts:
+                            last_key = max(self._transcripts.keys())
+                            last_text = self._transcripts[last_key]
+                            if _is_near_duplicate(chunk_text, last_text):
+                                print(f"  [near-duplicate filtered] {chunk_text}", flush=True)
+                                return
+                        self._transcripts[chunk_idx] = chunk_text
 
                     if self.on_partial:
                         self.on_partial(chunk_text)
 
-                    print(f"  [chunk] {chunk_text}", flush=True)
+                    print(f"  [chunk {chunk_idx}] {chunk_text}", flush=True)
             elif chunk_text:
                 print(f"  [filtered hallucination] {chunk_text}", flush=True)
 

@@ -103,7 +103,7 @@ On first run, the Whisper model (~1.5GB) downloads automatically. After that, st
 The `setup.sh` script handles everything:
 
 1. Installs system dependencies (portaudio via Homebrew)
-2. Installs Python packages (mlx-whisper, silero-vad, torch, pyaudio, pynput, rumps)
+2. Installs pinned Python packages from `requirements.txt` (mlx-whisper, silero-vad, torch, pyaudio, pynput, rumps, ...)
 3. Downloads the MLX Whisper large-v3-turbo model (~1.5GB, one-time)
 4. Verifies the installation
 
@@ -156,6 +156,7 @@ jarvis/
 │   ├── streaming_stt.py    # MLX Whisper + Silero VAD streaming engine
 │   ├── speech_to_text.py   # Batch mode fallback (whisper.cpp)
 │   └── voice_capture.py    # Batch audio recording fallback
+├── requirements.txt        # Pinned, verified Python dependencies
 ├── setup.sh                # One-click installer
 └── run.sh                  # Launcher
 ```
