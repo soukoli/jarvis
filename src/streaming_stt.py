@@ -103,27 +103,33 @@ except ImportError:
     _mlx_whisper = None
 
 
-# Available models with display info
+# Available models with display info.
+# "repo" is the exact Hugging Face repo used by MLX Whisper. Do not derive it
+# from the key: e.g. mlx-community/whisper-small does not exist (HTTP 401).
 AVAILABLE_MODELS: Dict[str, Dict[str, str]] = {
     "large-v3-turbo": {
+        "repo": "mlx-community/whisper-large-v3-turbo",
         "display": "large-v3-turbo — 1.5 GB, nejlepší přesnost",
         "size": "1.5 GB",
         "speed": "~2s",
         "note": "Doporučeno",
     },
     "large-v3-turbo-q4": {
+        "repo": "mlx-community/whisper-large-v3-turbo-q4",
         "display": "large-v3-turbo-q4 — 380 MB, rychlý",
         "size": "380 MB",
         "speed": "~1.5s",
         "note": "4-bit kvantizace, skoro stejná přesnost",
     },
     "medium": {
+        "repo": "mlx-community/whisper-medium-mlx-4bit",
         "display": "medium — 500 MB, vyvážený",
         "size": "500 MB",
         "speed": "~1s",
         "note": "Rychlejší, mírně nižší přesnost",
     },
     "small": {
+        "repo": "mlx-community/whisper-small-mlx-q4",
         "display": "small — 150 MB, nejrychlejší",
         "size": "150 MB",
         "speed": "<1s",
@@ -142,7 +148,10 @@ def _get_whisper_model(model_size: str = "large-v3-turbo", device: str = "cpu", 
         if _whisper_model is None:
             if _USE_MLX:
                 print(f"Using MLX Whisper: {model_size} (Apple Silicon GPU)...", flush=True)
-                _whisper_model = ("mlx", f"mlx-community/whisper-{model_size}")
+                repo = AVAILABLE_MODELS.get(model_size, {}).get(
+                    "repo", f"mlx-community/whisper-{model_size}"
+                )
+                _whisper_model = ("mlx", repo)
             else:
                 from faster_whisper import WhisperModel
                 print(f"Loading faster-whisper model: {model_size} ({compute_type})...", flush=True)
@@ -619,7 +628,8 @@ class StreamingSTT:
         except Exception as e:
             print(f"Transcription error: {e}", flush=True)
         finally:
-            self._processing_count -= 1
+            with self._lock:
+                self._processing_count -= 1
 
     # === Legacy compatibility methods ===
 
