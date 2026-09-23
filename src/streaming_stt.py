@@ -290,17 +290,60 @@ class StreamingSTT:
         return devices
 
     def _find_device_index(self) -> Optional[int]:
-        """Find device index for selected device"""
+        """Find device index for selected device.
+
+        Resolution order:
+        1. Exact match on configured device name
+        2. Case-insensitive substring match (survives renamed BT devices)
+        3. macOS default input device
+        4. First device with input channels
+        """
         audio = pyaudio.PyAudio()
         try:
             if self._selected_device_name:
+                target = self._selected_device_name
+                target_lower = target.lower()
+
+                # Exact match
                 for i in range(audio.get_device_count()):
                     info = audio.get_device_info_by_index(i)
-                    if info['maxInputChannels'] > 0 and info['name'] == self._selected_device_name:
+                    if info['maxInputChannels'] > 0 and info['name'] == target:
                         return i
-                print(f"Warning: Device '{self._selected_device_name}' not found, using default", flush=True)
 
-            # Fallback to first available
+                # Fuzzy match (case-insensitive substring, either direction)
+                for i in range(audio.get_device_count()):
+                    info = audio.get_device_info_by_index(i)
+                    if info['maxInputChannels'] <= 0:
+                        continue
+                    name_lower = info['name'].lower()
+                    if target_lower in name_lower or name_lower in target_lower:
+                        print(
+                            f"Device '{target}' not found exactly, "
+                            f"using close match: '{info['name']}'",
+                            flush=True,
+                        )
+                        return i
+
+                print(
+                    f"Warning: Device '{target}' not found, "
+                    "falling back to system default input",
+                    flush=True,
+                )
+
+            # Fallback to macOS system default input device
+            try:
+                default_info = audio.get_default_input_device_info()
+                if default_info.get('maxInputChannels', 0) > 0:
+                    print(
+                        f"Using default input device: '{default_info['name']}' "
+                        f"(index {default_info['index']})",
+                        flush=True,
+                    )
+                    return int(default_info['index'])
+            except Exception:
+                pass
+
+            # Last resort: first device with input channels
             for i in range(audio.get_device_count()):
                 info = audio.get_device_info_by_index(i)
                 if info['maxInputChannels'] > 0:
@@ -371,6 +414,15 @@ class StreamingSTT:
             return
 
         try:
+            device_info = self._audio.get_device_info_by_index(device_index)
+            print(
+                f"Using device: {device_info['name']} (index {device_index})",
+                flush=True,
+            )
+        except Exception:
+            pass
+
+        try:
             self._stream = self._audio.open(
                 format=pyaudio.paInt16,
                 channels=1,
@@ -391,7 +443,14 @@ class StreamingSTT:
         speech_buffer = []          # Accumulate speech frames
         silence_frames = 0          # Count consecutive silence frames
         is_speaking = False         # Currently in speech segment
-        
+
+        # Silent-input detection (catches macOS mic permission denial —
+        # PyAudio opens the stream but delivers all-zero buffers)
+        frames_seen = 0
+        silent_frames = 0
+        silence_check_frames = int(2.0 * self.sample_rate / self.chunk_size)  # ~2s at 16kHz
+        silence_alerted = False
+
         frames_per_ms = self.sample_rate / 1000
         silence_frames_threshold = int(self.min_silence_ms * frames_per_ms / self.chunk_size)
         min_speech_frames = int(self.min_speech_ms * frames_per_ms / self.chunk_size)
@@ -406,6 +465,22 @@ class StreamingSTT:
                 # Convert to float32 for VAD
                 audio_int16 = np.frombuffer(raw_data, dtype=np.int16)
                 audio_float = audio_int16.astype(np.float32) / 32768.0
+
+                # Silent-input detection: count frames that are literally all zero
+                frames_seen += 1
+                if not audio_int16.any():
+                    silent_frames += 1
+                if (not silence_alerted
+                        and frames_seen >= silence_check_frames
+                        and silent_frames >= silence_check_frames * 0.95):
+                    silence_alerted = True
+                    print(
+                        "⚠️  Microphone is delivering silence (all-zero samples).\n"
+                        "   Most likely cause: macOS Microphone permission is DENIED\n"
+                        "   for the app that launched Jarvis (Terminal / iTerm / opencode).\n"
+                        "   Fix: System Settings → Privacy & Security → Microphone → enable it.",
+                        flush=True,
+                    )
 
                 # Run VAD
                 audio_tensor = torch.from_numpy(audio_float)
