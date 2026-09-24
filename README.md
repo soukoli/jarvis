@@ -64,6 +64,9 @@ scripts/package.sh --install      # Release build → dist/*.dmg, *.pkg; install
 Then launch **Jarvis** from Spotlight or Launchpad, or enable *Launch at login* in Settings.
 To update, `git pull` and run `scripts/package.sh --install` again; permissions stay granted.
 
+The app goes to `/Applications`. On a managed Mac that folder needs admin rights: get them
+first (Privileges app), or let the script fall back to `~/Applications`, which works the same.
+
 The `dist/` packages are for the same Mac. Managed SAP Macs only run Developer ID signed and
 notarized apps downloaded from elsewhere, so a shared download needs the SAP signing pipeline
 first (see `AGENTS.md`, known gaps).

@@ -62,12 +62,29 @@ rm -rf "$PKGROOT"
 echo "▶ $DIST/Jarvis-$VERSION.pkg"
 
 if [[ "${1:-}" == "--install" ]]; then
-  # /Applications may be admin-only on managed Macs; ~/Applications is indexed by Spotlight too.
+  # Prefer /Applications. On managed Macs it is admin-only: with temporary admin rights
+  # (Privileges app) sudo works; otherwise fall back to ~/Applications, which Spotlight and
+  # Launchpad index as well.
   TARGET=/Applications
-  [ -w /Applications ] || { TARGET="$HOME/Applications"; mkdir -p "$TARGET"; }
+  SUDO=""
+  if [[ ! -w /Applications ]]; then
+    if [[ -t 0 ]] && sudo -v -p "Admin password for /Applications (Enter to skip → ~/Applications): " 2>/dev/null; then
+      SUDO=sudo
+    else
+      TARGET="$HOME/Applications"; mkdir -p "$TARGET"
+      echo "ℹ️  /Applications is not writable; installing to ~/Applications instead."
+      echo "   For /Applications, get admin rights first (Privileges app) and re-run."
+    fi
+  fi
   pkill -x Jarvis 2>/dev/null || true
-  rm -rf "$TARGET/Jarvis.app"
-  cp -R "$APP" "$TARGET/Jarvis.app"
+  $SUDO rm -rf "$TARGET/Jarvis.app"
+  $SUDO cp -R "$APP" "$TARGET/Jarvis.app"
+  # Avoid two copies: remove the one in the other location when we can.
+  if [[ "$TARGET" == /Applications ]]; then
+    rm -rf "$HOME/Applications/Jarvis.app"
+  elif [[ -d /Applications/Jarvis.app ]]; then
+    echo "⚠️  An older copy remains in /Applications (admin rights needed to remove it)."
+  fi
   open "$TARGET/Jarvis.app"
   echo "▶ installed and launched $TARGET/Jarvis.app"
 fi
