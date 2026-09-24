@@ -56,8 +56,9 @@ echo "▶ $DIST/Jarvis-$VERSION.dmg"
 PKGROOT=$(mktemp -d)
 mkdir -p "$PKGROOT/Applications"
 cp -R "$APP" "$PKGROOT/Applications/"
+# pkgbuild prints "write: Permission denied" on managed Macs while still producing the package.
 pkgbuild --quiet --root "$PKGROOT" --identifier com.sap.jarvis.pkg --version "$VERSION" \
-  --install-location / "$DIST/Jarvis-$VERSION.pkg"
+  --install-location / "$DIST/Jarvis-$VERSION.pkg" 2> >(grep -v '^write: Permission denied' >&2)
 rm -rf "$PKGROOT"
 echo "▶ $DIST/Jarvis-$VERSION.pkg"
 
