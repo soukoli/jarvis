@@ -70,7 +70,7 @@ final class AppModel {
     /// Status-item image. Template (system-tinted) when idle, red microphone while recording,
     /// orange waveform while the last chunk is being transcribed and inserted.
     var menuBarImage: NSImage {
-        let config = NSImage.SymbolConfiguration(pointSize: 15, weight: .medium)
+        let config = NSImage.SymbolConfiguration(textStyle: .body, scale: .large)
         switch state {
         case .idle:
             let name = permissionsMissing ? "exclamationmark.triangle" : (models.status.isReady ? "mic" : "mic.slash")
