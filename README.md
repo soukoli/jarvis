@@ -56,7 +56,7 @@ the Mac you build it on without any further approval.
 
 ```bash
 brew install xcodegen
-git clone https://github.tools.sap/I314819/jarvis.git && cd jarvis
+git clone https://github.tools.sap/I314819/sap-jarvis.git && cd jarvis
 scripts/make-dev-cert.sh          # once per Mac: local signing certificate
 scripts/package.sh --install      # Release build → dist/*.dmg, *.pkg; installs and launches
 ```

@@ -393,7 +393,7 @@ final class AppModel {
     }
 
     /// Issue tracker on SAP GitHub. Pre-fills the environment so colleagues do not have to.
-    static let issuesURL = URL(string: "https://github.tools.sap/I314819/jarvis/issues")!
+    static let issuesURL = URL(string: "https://github.tools.sap/I314819/sap-jarvis/issues")!
 
     func reportIssue() {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
