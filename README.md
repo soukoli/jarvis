@@ -112,9 +112,19 @@ AVCaptureSession ─► Silero VAD ─► WhisperKit large-v3-turbo ─► filte
 
 ## Privacy
 
-Audio is processed in memory and never written to disk. Transcribed text goes only to the app
-you are typing in (or to the clipboard when you choose so) and is never logged. The only network
-access is the one-time model download from Hugging Face.
+- **Voice:** recognized on this Mac by the Neural Engine. Audio stays in memory and is discarded
+  after each recording; nothing is written to disk, nothing is sent anywhere.
+- **Text:** goes only into the app you dictate into, or to the clipboard when you choose so. The
+  clipboard copy is marked transient so clipboard managers skip it, and the previous clipboard is
+  restored. Transcripts are never logged; diagnostics contain timings, sizes and device names.
+- **Network:** a one-time model download from huggingface.co. No analytics, crash reporting or
+  update checks. *Report an Issue* opens SAP GitHub in your browser only when you click it.
+- **Stored locally:** settings in the app's preferences (`com.sap.jarvis`) and the models in
+  `~/Library/Application Support/Jarvis/Models`. Settings → Privacy shows both and can reset the
+  settings.
+- **Permissions:** Microphone (only while recording) and Accessibility (only to place text at the
+  cursor and send ⌘V; no screen or keystroke reading). No Input Monitoring, no Screen Recording.
+- **No accounts:** no Apple ID, iCloud or SAP login is used; nothing syncs.
 
 ## Development
 

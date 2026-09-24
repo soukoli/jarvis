@@ -117,9 +117,9 @@ public actor WhisperKitTranscriber: Transcriber {
         let language = results.first?.language ?? decode.language
 
         if text.isEmpty, !segments.isEmpty {
-            // Segments without text: log what the decoder produced so the cause can be found.
+            // Segments without text: log decoder statistics (never the text itself).
             let detail = segments.prefix(3).map {
-                "tokens=\($0.tokens.count) logprob=\(String(format: "%.2f", $0.avgLogprob)) cr=\(String(format: "%.2f", $0.compressionRatio)) t=\($0.temperature) raw=\"\($0.text.prefix(40))\""
+                "tokens=\($0.tokens.count) logprob=\(String(format: "%.2f", $0.avgLogprob)) cr=\(String(format: "%.2f", $0.compressionRatio)) t=\($0.temperature) chars=\($0.text.count)"
             }.joined(separator: "; ")
             Log.pipeline.notice(
                 "empty text from \(segments.count, privacy: .public) segments [lang \(language ?? "?", privacy: .public), hint \(String(describing: hint), privacy: .public), prompt \(prompt != nil, privacy: .public)]: \(detail, privacy: .public)"

@@ -11,10 +11,98 @@ struct SettingsView: View {
             AudioSettings().tabItem { Label("Audio", systemImage: "mic") }
             ModelSettings().tabItem { Label("Models", systemImage: "cpu") }
             PermissionSettings().tabItem { Label("Permissions", systemImage: "lock.shield") }
+            PrivacySettings().tabItem { Label("Privacy", systemImage: "hand.raised") }
             AboutSettings().tabItem { Label("About", systemImage: "info.circle") }
         }
         .frame(width: 520)
         .environment(model)
+    }
+}
+
+// MARK: - Privacy
+
+/// Plain statement of what the app does with data, plus the two controls a user needs: see the
+/// files it keeps and wipe its settings. Keep this in sync with README "Privacy".
+struct PrivacySettings: View {
+    @Environment(AppModel.self) private var model
+    @State private var confirmReset = false
+
+    var body: some View {
+        Form {
+            Section("Your voice and text") {
+                PrivacyRow(
+                    symbol: "waveform", title: "Speech is recognized on this Mac",
+                    detail:
+                        "Audio stays in memory and is discarded after each recording. Nothing is written to disk and nothing is sent anywhere."
+                )
+                PrivacyRow(
+                    symbol: "text.cursor", title: "Text goes only where you dictate it",
+                    detail:
+                        "Into the focused app, or to the clipboard when you choose so. The clipboard copy is marked transient so clipboard managers skip it, and your previous clipboard is restored."
+                )
+                PrivacyRow(
+                    symbol: "doc.text.magnifyingglass", title: "Transcripts are never logged",
+                    detail: "Diagnostics record timings, sizes and device names only.")
+            }
+            Section("Network") {
+                PrivacyRow(
+                    symbol: "arrow.down.circle", title: "One download, no telemetry",
+                    detail:
+                        "The speech and voice-detection models are fetched once from huggingface.co. There is no analytics, crash reporting or update check. “Report an Issue” opens SAP GitHub in your browser on request."
+                )
+            }
+            Section("Stored on this Mac") {
+                PrivacyRow(
+                    symbol: "internaldrive", title: "Settings",
+                    detail:
+                        "Language, shortcuts, microphone, vocabulary and toggles in the app's preferences (com.sap.jarvis)."
+                )
+                PrivacyRow(
+                    symbol: "cpu", title: "Models",
+                    detail: "~/Library/Application Support/Jarvis/Models (about 1.6 GB).")
+                HStack {
+                    Button("Show Models Folder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([WhisperModel.defaultDownloadBase])
+                    }
+                    Button("Reset Settings…", role: .destructive) { confirmReset = true }
+                }
+                .controlSize(.small)
+            }
+            Section("Permissions") {
+                PrivacyRow(symbol: "mic", title: "Microphone", detail: "Only while you record.")
+                PrivacyRow(
+                    symbol: "accessibility", title: "Accessibility",
+                    detail:
+                        "Used solely to place text at the cursor and to send ⌘V. Jarvis does not read screen content or keystrokes."
+                )
+            }
+        }
+        .formStyle(.grouped)
+        .confirmationDialog("Reset all settings to defaults?", isPresented: $confirmReset) {
+            Button("Reset", role: .destructive) {
+                model.settings.resetToDefaults()
+                model.registerHotkeys()
+            }
+        } message: {
+            Text("Shortcuts, language, microphone and vocabulary return to defaults. Downloaded models are kept.")
+        }
+    }
+}
+
+struct PrivacyRow: View {
+    let symbol: String
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol).frame(width: 18).foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 

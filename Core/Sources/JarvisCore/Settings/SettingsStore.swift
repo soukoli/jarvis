@@ -138,6 +138,30 @@ public final class SettingsStore {
         Log.app.info("migrated legacy config from \(url.path, privacy: .public)")
     }
 
+    /// Restore every setting to its default. Models on disk are left alone.
+    public func resetToDefaults() {
+        language = "auto"
+        preferredLanguages = []
+        modelKey = WhisperModel.default.id
+        deviceUID = nil
+        deviceName = nil
+        preferBuiltInMic = false
+        completionSound = true
+        startSound = true
+        insertionMode = .insert
+        glossary = ""
+        vadThreshold = 0.5
+        minSpeechMs = 250
+        minSilenceMs = 600
+        hotkeyStart = .defaultStart
+        hotkeyStop = .defaultStop
+        hotkeyCancel = .defaultCancel
+        hotkeyPushToTalk = .defaultPushToTalk
+        pushToTalkEnabled = true
+        showPreview = true
+        debugLogging = false
+    }
+
     // MARK: - Helpers
 
     private func save(_ hotkey: Hotkey, key: String) {
