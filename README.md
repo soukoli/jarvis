@@ -9,6 +9,9 @@
 Click into any text field, press a shortcut, speak Czech, English or both in one sentence.
 The text appears at your cursor a second after you stop. Nothing leaves the machine.
 
+**macOS only (Apple Silicon, macOS 26+).** There is no hosted download yet: you build and
+install it on your own Mac with the two commands below, which takes a few minutes.
+
 [![macOS](https://img.shields.io/badge/macOS-26+-000000?style=for-the-badge&logo=apple&logoColor=white)](#requirements)
 [![Apple Silicon](https://img.shields.io/badge/Apple_Silicon-Neural_Engine-1d1d1f?style=for-the-badge&logo=apple&logoColor=white)](#how-it-works)
 [![Swift 6](https://img.shields.io/badge/Swift-6-f05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org)
@@ -46,7 +49,10 @@ spoken chunk on its own. A preferred-language list narrows detection when you on
 
 A vocabulary field (names, products, abbreviations such as "SAP, BTP, Jira") biases spelling.
 
-## Install
+## Install (build on your Mac)
+
+Requires Xcode 26 and Homebrew. Everything is built and signed locally, so the app runs on
+the Mac you build it on without any further approval.
 
 ```bash
 brew install xcodegen
@@ -56,7 +62,11 @@ scripts/package.sh --install      # Release build → dist/*.dmg, *.pkg; install
 ```
 
 Then launch **Jarvis** from Spotlight or Launchpad, or enable *Launch at login* in Settings.
-`dist/Jarvis-<version>.pkg` is the installer for another Mac.
+To update, `git pull` and run `scripts/package.sh --install` again; permissions stay granted.
+
+The `dist/` packages are for the same Mac. Managed SAP Macs only run Developer ID signed and
+notarized apps downloaded from elsewhere, so a shared download needs the SAP signing pipeline
+first (see `AGENTS.md`, known gaps).
 
 On first launch Jarvis asks for **Microphone** and **Accessibility** in
 System Settings → Privacy & Security. The speech model (1.6 GB) downloads once into
