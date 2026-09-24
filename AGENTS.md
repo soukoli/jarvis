@@ -28,8 +28,11 @@ Whisper models are cached by Hugging Face Hub in `~/.cache/huggingface/hub`.
 - **MLX model ids are explicit** in `AVAILABLE_MODELS[...]["repo"]`. Do not derive
   `mlx-community/whisper-<key>` from the key: `mlx-community/whisper-small` does not
   exist. Verify a new repo with `curl -sI https://huggingface.co/api/models/<repo>`.
-- Python is the shared global mise 3.12 env, not a venv. Other tools (esphome,
+- Python is the shared global mise 3.13 env, not a venv. Other tools (esphome,
   platformio) live there too; avoid unrelated upgrades.
+- rumps notifications need `Info.plist` (with `CFBundleIdentifier`) next to the
+  interpreter. `run.sh` creates it on first start; `_notify()` in `jarvis.py` keeps
+  the app alive if it is still missing.
 - `whisper.cpp/`, `.voice_cache/`, `__pycache__/`, `.claude/settings.local.json` are
   git-ignored. Never commit them.
 - `origin` has two push URLs (github.com/soukoli/jarvis and github.tools.sap). One
