@@ -26,6 +26,7 @@ struct SettingsView: View {
 struct PrivacySettings: View {
     @Environment(AppModel.self) private var model
     @State private var confirmReset = false
+    @State private var confirmDeleteModels = false
 
     var body: some View {
         Form {
@@ -65,6 +66,7 @@ struct PrivacySettings: View {
                         NSWorkspace.shared.activateFileViewerSelecting([WhisperModel.defaultDownloadBase])
                     }
                     Button("Reset Settings…", role: .destructive) { confirmReset = true }
+                    Button("Delete Models…", role: .destructive) { confirmDeleteModels = true }
                 }
                 .controlSize(.small)
             }
@@ -85,6 +87,11 @@ struct PrivacySettings: View {
             }
         } message: {
             Text("Shortcuts, language, microphone and vocabulary return to defaults. Downloaded models are kept.")
+        }
+        .confirmationDialog("Delete downloaded models and quit Jarvis?", isPresented: $confirmDeleteModels) {
+            Button("Delete and Quit", role: .destructive) { model.deleteModelsAndQuit() }
+        } message: {
+            Text("Frees about 1.6 GB. The next launch downloads the model again. Use this before uninstalling.")
         }
     }
 }
@@ -130,7 +137,6 @@ struct GeneralSettings: View {
                 Picker("After transcription", selection: $settings.insertionMode) {
                     ForEach(InsertionMode.allCases) { Text($0.title).tag($0) }
                 }
-                Toggle("Show live preview in the menu", isOn: $settings.showPreview)
             }
             Section("Vocabulary") {
                 TextField("Words the model should spell correctly", text: $settings.glossary, axis: .vertical)

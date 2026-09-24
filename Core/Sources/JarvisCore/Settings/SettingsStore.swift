@@ -70,7 +70,6 @@ public final class SettingsStore {
     public var hotkeyCancel: Hotkey { didSet { save(hotkeyCancel, key: "hotkeyCancel") } }
     public var hotkeyPushToTalk: Hotkey { didSet { save(hotkeyPushToTalk, key: "hotkeyPushToTalk") } }
     public var pushToTalkEnabled: Bool { didSet { defaults.set(pushToTalkEnabled, forKey: "pushToTalkEnabled") } }
-    public var showPreview: Bool { didSet { defaults.set(showPreview, forKey: "showPreview") } }
     public var debugLogging: Bool { didSet { defaults.set(debugLogging, forKey: "debugLogging") } }
     public var onboardingDone: Bool { didSet { defaults.set(onboardingDone, forKey: "onboardingDone") } }
 
@@ -94,7 +93,6 @@ public final class SettingsStore {
         hotkeyCancel = Self.load(defaults, key: "hotkeyCancel") ?? .defaultCancel
         hotkeyPushToTalk = Self.load(defaults, key: "hotkeyPushToTalk") ?? .defaultPushToTalk
         pushToTalkEnabled = defaults.object(forKey: "pushToTalkEnabled") as? Bool ?? true
-        showPreview = defaults.object(forKey: "showPreview") as? Bool ?? true
         debugLogging = defaults.bool(forKey: "debugLogging")
         onboardingDone = defaults.bool(forKey: "onboardingDone")
 
@@ -158,7 +156,6 @@ public final class SettingsStore {
         hotkeyCancel = .defaultCancel
         hotkeyPushToTalk = .defaultPushToTalk
         pushToTalkEnabled = true
-        showPreview = true
         debugLogging = false
     }
 

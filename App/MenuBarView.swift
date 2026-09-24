@@ -46,18 +46,6 @@ struct MenuBarView: View {
 
     @ViewBuilder private var statusSection: some View {
         Text(model.statusText)
-        if model.state == .recording, !model.partialText.isEmpty, model.settings.showPreview {
-            Text(preview(model.partialText)).font(.caption)
-        }
-        if model.state == .idle, !model.lastText.isEmpty {
-            Button {
-                let pb = NSPasteboard.general
-                pb.clearContents()
-                pb.setString(model.lastText, forType: .string)
-            } label: {
-                Text("Copy last: “\(preview(model.lastText))”")
-            }
-        }
         if let error = model.lastError {
             Text("⚠︎ \(error)").font(.caption)
         }
@@ -182,8 +170,4 @@ struct MenuBarView: View {
         }
     }
 
-    private func preview(_ text: String, max: Int = 60) -> String {
-        let flat = text.replacingOccurrences(of: "\n", with: " ")
-        return flat.count > max ? String(flat.prefix(max)) + "…" : flat
-    }
 }

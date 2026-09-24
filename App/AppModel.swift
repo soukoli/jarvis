@@ -19,8 +19,6 @@ final class AppModel {
     let hotkeys = HotkeyManager()
 
     private(set) var state: State = .idle
-    private(set) var partialText = ""
-    private(set) var lastText = ""
     private(set) var lastInsertion: InsertionStrategy?
     private(set) var lastError: String?
     private(set) var lastLatencySeconds: Double?
@@ -145,7 +143,6 @@ final class AppModel {
             device: device
         )
         self.session = session
-        partialText = ""
         lastError = nil
         silentInputDetected = false
         state = .recording
@@ -166,7 +163,7 @@ final class AppModel {
             for await event in session.events {
                 guard gen == self.generation else { break }
                 switch event {
-                case .partial(let text): self.partialText = text
+                case .partial: break
                 case .chunk(let index, _, let audio, let decode):
                     Log.pipeline.debug(
                         "chunk \(index) \(audio, format: .fixed(precision: 1)) s audio in \(decode, format: .fixed(precision: 2)) s"
@@ -209,7 +206,6 @@ final class AppModel {
         generation += 1
         self.session = nil
         state = .idle
-        partialText = ""
         Sounds.play(.cancel)
         Task { await session.cancel() }
     }
@@ -225,7 +221,6 @@ final class AppModel {
     // MARK: - Delivery
 
     private func deliver(_ text: String) async {
-        lastText = text
         guard !text.isEmpty else {
             lastInsertion = nil
             notify(title: "Nothing recognized", body: "No speech was detected.")
@@ -394,6 +389,14 @@ final class AppModel {
 
     /// Issue tracker on SAP GitHub. Pre-fills the environment so colleagues do not have to.
     static let issuesURL = URL(string: "https://github.tools.sap/I314819/sap-jarvis/issues")!
+
+    /// Remove every downloaded model and quit; the next launch downloads again. Used to clean up
+    /// before uninstalling.
+    func deleteModelsAndQuit() {
+        models.unload()
+        try? FileManager.default.removeItem(at: WhisperModel.defaultDownloadBase)
+        NSApp.terminate(nil)
+    }
 
     func reportIssue() {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"

@@ -126,6 +126,8 @@ AVCaptureSession ─► Silero VAD ─► WhisperKit large-v3-turbo ─► filte
   cursor and send ⌘V; no screen or keystroke reading). No Input Monitoring, no Screen Recording.
 - **No accounts:** no Apple ID, iCloud or SAP login is used; nothing syncs.
 
+The full data protection record is in `PRIVACY.md`.
+
 ## Development
 
 ```bash
