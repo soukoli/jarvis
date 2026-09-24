@@ -1,301 +1,116 @@
 <div align="center">
 
-# Jarvis
+<img src="App/Assets.xcassets/AppIcon.appiconset/icon_256.png" alt="SAP Jarvis" width="128" />
 
-### Think out loud. Let your voice do the typing.
+# SAP Jarvis
 
-Speak your thoughts naturally. Get instant text on your clipboard. Paste anywhere.
+**Voice to text, straight into the app you are working in. On-device, on your Mac.**
 
-Local. Private. GPU-accelerated. No cloud, no subscription, no limits.
+Click into any text field, press a shortcut, speak Czech, English or both in one sentence.
+The text appears at your cursor a second after you stop. Nothing leaves the machine.
 
-[![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-black?logo=apple)](https://support.apple.com/en-us/111902)
-[![Offline](https://img.shields.io/badge/100%25-Offline-green)](.)
-[![License](https://img.shields.io/badge/license-MIT-blue)](#license)
-[![Python](https://img.shields.io/badge/Python-3.13-yellow?logo=python)](https://python.org)
+[![macOS](https://img.shields.io/badge/macOS-26+-000000?style=for-the-badge&logo=apple&logoColor=white)](#requirements)
+[![Apple Silicon](https://img.shields.io/badge/Apple_Silicon-Neural_Engine-1d1d1f?style=for-the-badge&logo=apple&logoColor=white)](#how-it-works)
+[![Swift 6](https://img.shields.io/badge/Swift-6-f05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org)
+[![WhisperKit](https://img.shields.io/badge/WhisperKit-large--v3--turbo-5d36ff?style=for-the-badge)](https://github.com/argmaxinc/argmax-oss-swift)
+[![Languages](https://img.shields.io/badge/Languages-12_·_mixed-a100c2?style=for-the-badge)](#languages)
+[![100% on-device](https://img.shields.io/badge/100%25-on--device-36a41d?style=for-the-badge)](#privacy)
+
+<sub>SAP-internal</sub>
 
 </div>
 
----
+## Highlights
 
-## Why Voice?
+- **Insert at the cursor.** Native apps get the text through Accessibility, Electron apps and
+  terminals through ⌘V with your clipboard restored afterwards. Clipboard-only mode is available.
+- **Speak, do not wait.** Voice activity detection splits speech into chunks that are transcribed
+  while you are still talking. Stop, and the text is in place about a second later.
+- **Mixed languages, no switching.** Language is detected per chunk, so Czech with English terms,
+  or a sentence that changes language halfway, comes out right without picking a language first.
+- **Two ways to talk.** Toggle with ⌘; and ⌘', or hold ⌃⌥Space while you speak. All shortcuts
+  are configurable and bound to physical keys.
+- **Menu-bar app.** Settings for language preferences, model, microphone, vocabulary, VAD tuning,
+  sounds and launch at login. Permissions are explained on first launch.
 
-You **think 3x faster** than you type. Every time you reach for the keyboard, you lose context. Your brain is already three sentences ahead, but your fingers are still on the first word.
+## Languages
 
-**Jarvis changes that.**
+Auto-detect is the default and the recommended setting; the model identifies the language of each
+spoken chunk on its own. A preferred-language list narrows detection when you only ever use a few.
 
-- **Preserve the full depth of your thought.** Speaking captures nuances, context, and connections that get lost when you slow down to type.
-- **Perfect for people with vivid imagination.** If you think in rich context and big pictures, voice lets you externalize that without compression.
-- **Keep your hands free.** Code in your IDE while dictating a message. Browse documentation while describing a bug. Multitask naturally.
-- **Works everywhere.** Email, Slack, VS Code, terminal, browser - if you can paste, you can use Jarvis.
-- **No learning curve.** You already know how to talk.
-
-> *"The bottleneck isn't your thinking. It's the keyboard between your brain and the screen."*
-
----
-
-## How It Works
-
-```
-        Cmd+;                    Cmd+'                    Cmd+V
-          |                        |                        |
-    Start speaking      Stop & transcribe            Paste anywhere
-          |                        |                        |
-    [🔴 Recording]        [🧠 Processing]          [📋 Ready]
-          |                        |
-          v                        v
-    Silero VAD              MLX Whisper
-    (splits speech          (Apple GPU, chunks are
-     into chunks)            transcribed while you talk)
-```
-
-1. Press **Cmd+;** to start recording
-2. Speak naturally in Czech, English or any of the 12 supported languages
-3. Press **Cmd+'** to stop
-4. Wait for the "ding" sound
-5. Press **Cmd+V** to paste your transcribed text
-
-Speech is transcribed chunk by chunk *while you speak*, so when you press stop the text is usually already there.
-
----
-
-## Features
-
-| | Feature | Description |
-|---|---------|-------------|
-| ⚡ | **GPU-Accelerated** | MLX Whisper on Apple Silicon (Metal). faster-whisper CPU fallback on Intel |
-| 🎯 | **Streaming VAD** | Silero VAD cuts speech at natural pauses; each chunk is transcribed immediately |
-| 🤖 | **Model Switcher** | Pick between 4 Whisper models from the menu (accuracy vs speed) |
-| 🌍 | **Multilingual** | Czech, English + 10 more languages, or auto-detect |
-| 🔒 | **100% Offline** | Everything runs locally. Your voice never leaves your Mac |
-| 🧹 | **Anti-Hallucination** | Filters known Whisper artifacts, loops and near-duplicate chunks |
-| 🛡️ | **Permission Guard** | Detects missing Microphone / Accessibility permission and shows how to fix it |
-| 🎤 | **Menu Bar App** | Lives in your menu bar, always one hotkey away |
-| ⌨️ | **Global Hotkeys** | Works from any app, any context. Keys are configurable |
-| 🔊 | **Audio Feedback** | Optional spoken language announcement on start, "ding" when ready |
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- macOS with **Apple Silicon** (M1/M2/M3/M4)
-- Python 3.13 (the launcher prefers a [mise](https://mise.jdx.dev) install, then falls back to `python3`)
-- [Homebrew](https://brew.sh)
-
-### Install
-
-```bash
-git clone https://github.com/soukoli/jarvis.git
-cd jarvis
-./setup.sh
-```
-
-### Run
-
-```bash
-./run.sh
-```
-
-On first run, the Whisper model (~1.5GB) downloads automatically. After that, startup takes a few seconds while the model warms up in the background.
-
----
-
-## Setup Details
-
-The `setup.sh` script:
-
-1. Installs system dependencies (portaudio via Homebrew)
-2. Installs pinned Python packages from `requirements.txt` (mlx-whisper, silero-vad, torch, pyaudio, pynput, rumps, pyobjc, ...)
-3. Downloads the MLX Whisper large-v3-turbo model (~1.5GB, one-time)
-4. Verifies the installation
-
-### Permissions
-
-Jarvis runs inside the terminal that launched it, so macOS permissions are granted to **that terminal app** (Terminal, iTerm, ...). Two are needed:
-
-| Permission | Why | Where |
-|---|---|---|
-| **Microphone** | Recording. Without it PyAudio opens the stream but delivers silence | System Settings → Privacy & Security → Microphone |
-| **Accessibility** (and on newer macOS also **Input Monitoring**) | Global hotkeys via pynput | System Settings → Privacy & Security → Accessibility / Input Monitoring |
-
-Restart the terminal after changing permissions.
-
-Jarvis checks both at startup. If something is missing, the menu bar icon turns into **⚠️**, a notification appears, and the first menu item opens a dialog with an "Open System Settings" button. Use **🔄 Recheck permissions** after fixing them. Menu bar buttons work even without Accessibility - only the hotkeys need it.
-
----
-
-## Usage
-
-### Hotkeys
-
-| Key | Action |
-|-----|--------|
-| **Cmd+;** | Start recording |
-| **Cmd+'** | Stop & transcribe |
-| **Cmd+.** | Cancel anytime |
-
-The three keys are configurable in `~/.jarvis_config.json` (`hotkey_start`, `hotkey_stop`, `hotkey_cancel`); the Cmd modifier is fixed.
-
-### Menu Bar
-
-Click the icon to access:
-
-- **Permission status** and recheck
-- **Start / Stop / Cancel** (same as the hotkeys)
-- **Transcription Language** with flag indicator, or auto-detect
-- **Whisper Model** switcher (see table below). Takes effect on the next recording
-- **Streaming Mode** toggle (see note below)
-- **Completion Sound** and **Language Announcement** toggles
-- About, Quit
-
-### Whisper Models
-
-| Menu option | Hugging Face repo | Size | Notes |
+| | | | |
 |---|---|---|---|
-| large-v3-turbo | `mlx-community/whisper-large-v3-turbo` | 1.5 GB | Default. Best accuracy for Czech |
-| large-v3-turbo-q4 | `mlx-community/whisper-large-v3-turbo-q4` | ~380 MB | 4-bit, nearly the same accuracy, faster |
-| medium | `mlx-community/whisper-medium-mlx-4bit` | ~500 MB | Faster, slightly lower accuracy |
-| small | `mlx-community/whisper-small-mlx-q4` | ~150 MB | Fastest, good for short inputs |
+| 🇨🇿 Czech | 🇬🇧 English | 🇸🇰 Slovak | 🇩🇪 German |
+| 🇪🇸 Spanish | 🇫🇷 French | 🇮🇹 Italian | 🇵🇱 Polish |
+| 🇵🇹 Portuguese | 🇷🇺 Russian | 🇺🇦 Ukrainian | 🌐 Auto-detect |
 
-Models download on first use and are cached in `~/.cache/huggingface/hub`.
+A vocabulary field (names, products, abbreviations such as "SAP, BTP, Jira") biases spelling.
 
-### Icon States
-
-| Icon | State |
-|------|-------|
-| 🎤 + flag | Ready |
-| ⚠️ + flag | Ready, but a permission is missing (click the menu) |
-| 🔴 + flag | Recording |
-| 🧠 + flag | Transcribing |
-
-### Configuration
-
-Settings are saved to `~/.jarvis_config.json` whenever you change them in the menu:
-
-```json
-{
-  "completion_sound": true,
-  "language_announcement": false,
-  "streaming_mode": true,
-  "device_name": "MacBook Pro Microphone",
-  "language": "cs",
-  "model_size": "large-v3-turbo",
-  "hotkey_start": ";",
-  "hotkey_stop": "'",
-  "hotkey_cancel": "."
-}
-```
-
-`device_name` pins a microphone. If that device is not present, Jarvis falls back to a close name match, then the macOS default input.
-
-### Troubleshooting: "No transcription result"
-
-Run the diagnostics script. It reports permission status, all input devices, the configured device and a 3-second level test:
+## Install
 
 ```bash
-python3 diagnose.py
+brew install xcodegen
+git clone https://github.tools.sap/I314819/jarvis.git && cd jarvis
+scripts/make-dev-cert.sh          # once per Mac: local signing certificate
+scripts/package.sh --install      # Release build → dist/*.dmg, *.pkg; installs and launches
 ```
 
-An RMS of exactly 0.000 means the microphone permission is denied for your terminal.
+Then launch **Jarvis** from Spotlight or Launchpad, or enable *Launch at login* in Settings.
+`dist/Jarvis-<version>.pkg` is the installer for another Mac.
 
-### Streaming Mode off (batch mode)
+On first launch Jarvis asks for **Microphone** and **Accessibility** in
+System Settings → Privacy & Security. The speech model (1.6 GB) downloads once into
+`~/Library/Application Support/Jarvis/Models`; the first load prepares it for the Neural Engine
+and takes a minute or two, later launches take a few seconds.
 
-With **Streaming Mode** unchecked, Jarvis records a WAV file and transcribes it in one go with the whisper.cpp CLI. This path is a legacy fallback: `setup.sh` does **not** build whisper.cpp or download a `ggml-*.bin` model, so on a fresh install batch mode prints "Whisper not found" and produces nothing. Keep Streaming Mode on unless you have built `whisper.cpp/` yourself.
+The local certificate matters: macOS binds permission grants to the app's signing identity.
+`scripts/make-dev-cert.sh` creates a "Jarvis Dev" certificate in your login keychain so grants
+survive rebuilds. Distribution builds will use an SAP Developer ID instead.
 
----
+## Use
 
-## Architecture
+1. Click where the text should go.
+2. Press ⌘; and speak, or hold ⌃⌥Space while speaking.
+3. Press ⌘' or release ⌃⌥Space. A sound confirms the insertion.
+4. ⌘. cancels.
+
+Something off? *Report an Issue…* in the menu opens the tracker on SAP GitHub with your version
+and model pre-filled.
+
+## Requirements
+
+Apple Silicon Mac, macOS 26 or newer, about 2 GB of disk for the model. Xcode 26 and
+`xcodegen` to build.
+
+## How it works
 
 ```
-jarvis/
-├── jarvis.py               # App entry point: menu bar UI, hotkeys, permission checks
-├── src/
-│   ├── streaming_stt.py    # MLX Whisper + Silero VAD streaming engine, model switcher
-│   ├── speech_to_text.py   # Batch fallback via whisper.cpp CLI (not installed by setup.sh)
-│   └── voice_capture.py    # Batch WAV recorder (used only with Streaming Mode off)
-├── diagnose.py             # Microphone / permission diagnostics
-├── requirements.txt        # Pinned, verified Python dependencies
-├── setup.sh                # One-click installer
-├── run.sh                  # Launcher
-└── AGENTS.md / CLAUDE.md   # Guide for AI coding agents working on this repo
+AVCaptureSession ─► Silero VAD ─► WhisperKit large-v3-turbo ─► filters ─► insert at cursor
+ 16 kHz mono         chunks         per chunk, ANE             hallucination,   AX write, verified
+                     by pauses      language detected          duplicates       → ⌘V → clipboard
 ```
 
-### Tech Stack
+| Path | Role |
+|---|---|
+| `App/` | SwiftUI menu-bar app: state machine, menu, Settings, onboarding, design sources. |
+| `Core/` | SwiftPM package `JarvisCore`: capture, VAD, transcription, filters, session, text injection, hotkeys, settings. `jarvis-cli` and tests. |
+| `scripts/` | `build.sh`, `package.sh`, `make-dev-cert.sh`, `render-icons.sh`, `lint.sh`. |
+| `project.yml` | xcodegen spec for `Jarvis.xcodeproj` (generated, not committed). |
 
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| Inference | MLX Whisper (large-v3-turbo default) | Apple Silicon GPU via Metal |
-| CPU fallback | faster-whisper (CTranslate2) | Intel Macs / no MLX |
-| VAD | Silero VAD | Lightweight, accurate voice detection |
-| Audio | PyAudio | Low-level mic access, 16kHz mono |
-| UI | rumps | Native macOS menu bar integration |
-| Hotkeys | pynput | System-wide keyboard capture |
-| Permissions | pyobjc (AVFoundation, ApplicationServices) | Query TCC status without prompting |
+## Privacy
 
-### Pipeline
-
-1. PyAudio delivers 32 ms frames (512 samples at 16 kHz).
-2. Silero VAD scores each frame. Speech frames are buffered; 600 ms of silence closes a chunk (minimum 250 ms of speech).
-3. Each chunk is transcribed on a background thread, indexed so results assemble in order regardless of finish time.
-4. Chunks matching known hallucination patterns, repetitive loops, or near-duplicates of the previous chunk are dropped.
-5. On stop, remaining audio is flushed, pending chunks are awaited (up to 15 s), the text is joined and copied to the clipboard with `pbcopy`.
-
-### Performance (indicative, M-series, large-v3-turbo)
-
-| Metric | Value |
-|--------|-------|
-| Inference speed | ~2 s per 5 s chunk |
-| Model warm-up | background, at startup |
-| Supported languages | 12 + auto-detect |
-
----
-
-## Who Is This For?
-
-- **Developers** who want to dictate commit messages, code comments, or chat with AI assistants
-- **Writers** who think faster than they type
-- **Multitaskers** who want to keep hands on other tasks while capturing thoughts
-- **Anyone** who values privacy and doesn't want their voice sent to the cloud
-
----
-
-## FAQ
-
-**Q: Does it work without internet?**
-A: Yes. 100% offline after the initial model download.
-
-**Q: Which languages are supported?**
-A: Czech, English, German, Spanish, French, Italian, Polish, Portuguese, Russian, Slovak, Ukrainian + auto-detect.
-
-**Q: How accurate is it?**
-A: Whisper large-v3-turbo achieves roughly 5-8% word error rate on clean speech. Comparable to cloud services.
-
-**Q: Does it work on Intel Macs?**
-A: It falls back to CPU mode (faster-whisper). Works but several times slower, and only the `large-v3-turbo`, `medium` and `small` model options are valid there.
-
-**Q: Can I use it with [any app]?**
-A: If you can press Cmd+V in it, yes. It copies to the clipboard - universal.
-
-**Q: The icon shows ⚠️. What now?**
-A: Click it. The dialog lists what is missing and opens the right System Settings pane.
-
----
+Audio is processed in memory and never written to disk. Transcribed text goes only to the app
+you are typing in (or to the clipboard when you choose so) and is never logged. The only network
+access is the one-time model download from Hugging Face.
 
 ## Development
 
-See [AGENTS.md](AGENTS.md) for layout, runtime constraints (notably the torch/torchaudio pin), the verification checklist and the current list of known gaps.
+```bash
+cd Core && swift build && swift test
+scripts/lint.sh                 # swift-format, strict
+scripts/build.sh Debug --open   # quick Debug build and launch
+Core/.build/debug/jarvis-cli record --seconds 8 --insert
+```
 
----
-
-## License
-
-MIT
-
----
-
-<div align="center">
-
-*Built for people who think faster than they type.*
-
-</div>
+See `AGENTS.md` for conventions and runtime facts worth knowing before changing capture,
+transcription or insertion.
