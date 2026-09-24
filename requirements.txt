@@ -1,4 +1,4 @@
-# Jarvis — pinned, verified working set (macOS / Apple Silicon, Python 3.12)
+# Jarvis — pinned, verified working set (macOS / Apple Silicon, Python 3.13)
 # Regenerate after `pip install --upgrade ...` + smoke test.
 #
 # NOTE: torch/torchaudio must move together. torchaudio's latest release

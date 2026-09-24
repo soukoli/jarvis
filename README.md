@@ -11,7 +11,7 @@ Local. Private. GPU-accelerated. No cloud, no subscription, no limits.
 [![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-black?logo=apple)](https://support.apple.com/en-us/111902)
 [![Offline](https://img.shields.io/badge/100%25-Offline-green)](.)
 [![License](https://img.shields.io/badge/license-MIT-blue)](#license)
-[![Python](https://img.shields.io/badge/Python-3.12-yellow?logo=python)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.13-yellow?logo=python)](https://python.org)
 
 </div>
 
@@ -80,7 +80,7 @@ Speech is transcribed chunk by chunk *while you speak*, so when you press stop t
 ### Prerequisites
 
 - macOS with **Apple Silicon** (M1/M2/M3/M4)
-- Python 3.12 (the launcher prefers a [mise](https://mise.jdx.dev) install, then falls back to `python3`)
+- Python 3.13 (the launcher prefers a [mise](https://mise.jdx.dev) install, then falls back to `python3`)
 - [Homebrew](https://brew.sh)
 
 ### Install
