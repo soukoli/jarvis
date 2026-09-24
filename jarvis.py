@@ -25,6 +25,20 @@ from speech_to_text import WhisperSTT
 from streaming_stt import StreamingSTT, AVAILABLE_MODELS
 
 
+def _notify(title: str, subtitle: str = "", message: str = "") -> None:
+    """Show a macOS notification; never let a notification failure crash the app.
+
+    rumps needs an Info.plist with CFBundleIdentifier next to the Python binary.
+    On a bare interpreter (mise/pyenv/venv) it raises RuntimeError instead, so
+    fall back to a console line and keep running.
+    """
+    try:
+        rumps.notification(title=title, subtitle=subtitle, message=message)
+    except Exception as e:
+        print(f"[notify] {title} | {subtitle} | {message}", flush=True)
+        print(f"[notify] (notification center unavailable: {str(e).splitlines()[0]})", flush=True)
+
+
 def _check_microphone_permission() -> str:
     """Query macOS microphone authorization status via AVFoundation.
 
@@ -209,7 +223,7 @@ class JarvisApp(rumps.App):
             count = len(self.permission_warnings)
             plural = 's' if count > 1 else ''
             first = self.permission_warnings[0]['title']
-            rumps.notification(
+            _notify(
                 title="⚠️  Jarvis — permission issue" + plural,
                 subtitle=first,
                 message=(
@@ -364,7 +378,7 @@ class JarvisApp(rumps.App):
             item.state = 1 if mid == model_id else 0
 
         print(f"Model switched to: {model_id} — {info.get('note', '')}")
-        rumps.notification(
+        _notify(
             title="Model změněn",
             subtitle=model_display,
             message=f"Načte se při příští nahrávce  ·  {info.get('note', '')}"
@@ -398,7 +412,7 @@ class JarvisApp(rumps.App):
         # Warn if using English-only model for non-English language
         if lang_code not in ("auto", "en") and not self.stt.is_multilingual_model():
             print(f"⚠️  Warning: Current model is English-only. Download a multilingual model for best {lang_code} results.")
-            rumps.notification(
+            _notify(
                 title="⚠️  English-only Model",
                 subtitle=f"Selected: {lang_display}",
                 message="Go to Settings → Download Better Model for multilingual support"
@@ -496,19 +510,19 @@ class JarvisApp(rumps.App):
 
         new_warnings = len(self.permission_warnings)
         if new_warnings == 0:
-            rumps.notification(
+            _notify(
                 title="Jarvis",
                 subtitle="✅ Permissions OK",
                 message="All required permissions are granted."
             )
         elif new_warnings < old_warnings:
-            rumps.notification(
+            _notify(
                 title="Jarvis",
                 subtitle=f"{old_warnings - new_warnings} issue(s) resolved",
                 message=f"{new_warnings} still pending."
             )
         else:
-            rumps.notification(
+            _notify(
                 title="Jarvis",
                 subtitle=f"⚠️ {new_warnings} permission issue(s)",
                 message="Click the warning in the menu for details."
@@ -839,7 +853,7 @@ class JarvisApp(rumps.App):
             print(f"[{time.strftime('%H:%M:%S')}] Transcription cancelled", flush=True)
 
         # Show notification
-        rumps.notification(
+        _notify(
             title="Cancelled",
             subtitle="Operation stopped",
             message="Recording/transcription aborted"
